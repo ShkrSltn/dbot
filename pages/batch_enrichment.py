@@ -1,5 +1,5 @@
 import streamlit as st
-from service import enrich_statement_with_llm, calculate_quality_metrics
+from service import enrich_statement_with_llm, calculate_quality_metrics, get_statements_from_settings
 
 def display_batch_enrichment(sample_statements):
     st.title("🔄 Batch Enrichment")
@@ -12,10 +12,13 @@ def display_batch_enrichment(sample_statements):
     Select multiple statements to enrich at once or add your own custom statements.
     """)
     
-    # Create multiselect for sample statements
+    # Get statements based on user settings
+    available_statements = get_statements_from_settings()
+    
+    # Create multiselect for available statements
     selected_samples = st.multiselect(
         "Select statements to enrich:",
-        sample_statements,
+        available_statements,
         default=[]
     )
     

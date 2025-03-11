@@ -24,6 +24,8 @@ from pages.batch_enrichment import display_batch_enrichment
 from pages.quiz import display_quiz
 from pages.chatbot import display_chatbot
 from pages.analytics import display_analytics
+from pages.user_flow import display_user_flow
+from pages.user_settings import display_user_settings
 
 def run_app():
     # Debug information
@@ -66,6 +68,14 @@ def run_app():
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
 
+    # Initialize user settings if not exists
+    if 'user_settings' not in st.session_state:
+        st.session_state.user_settings = {
+            "selected_categories": [],
+            "custom_statements": [],
+            "max_statements_per_quiz": 5
+        }
+
     # Get sample statements
     sample_statements = get_sample_statements()
 
@@ -73,16 +83,24 @@ def run_app():
     st.sidebar.title("DigiBot Demo")
     page = st.sidebar.radio(
         "Navigation",
-        ["Home", "Profile Builder", "Enrichment Demo", "Batch Enrichment", "Quiz", "Chatbot", "Analytics"]
+        ["Home", "User Journey", "Profile Builder", "User Settings", "Enrichment Demo", "Batch Enrichment", "Quiz", "Chatbot", "Analytics"]
     )
 
     # Home page
     if page == "Home":
         display_home_page()
 
+    # User Journey page
+    elif page == "User Journey":
+        display_user_flow()
+
     # Profile Builder page
     elif page == "Profile Builder":
         display_profile_builder()
+
+    # User Settings page
+    elif page == "User Settings":
+        display_user_settings()
 
     # Enrichment Demo page
     elif page == "Enrichment Demo":

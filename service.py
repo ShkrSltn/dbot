@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from dotenv import load_dotenv
+import streamlit as st
 
 # LangChain imports
 from langchain_openai import ChatOpenAI
@@ -25,6 +26,35 @@ SAMPLE_STATEMENTS = [
     "I understand the ethical implications of digital technologies.",
     "I can adapt to new digital tools and technologies quickly."
 ]
+
+# Define statement categories
+STATEMENT_CATEGORIES = {
+    "Collaboration": [
+        "I can use digital technologies to collaborate with others.",
+        "I can share documents and resources through digital tools.",
+        "I can use online meeting tools effectively for team collaboration."
+    ],
+    "Security": [
+        "I know how to protect my personal data online.",
+        "I can identify potential security risks when using digital services.",
+        "I understand how to create and manage strong passwords."
+    ],
+    "Problem Solving": [
+        "I can identify and solve technical problems when using digital devices.",
+        "I can find solutions to technical issues using online resources.",
+        "I know how to evaluate and select digital tools for specific tasks."
+    ],
+    "Content Creation": [
+        "I can create digital content in different formats.",
+        "I know how to edit and improve content created by others.",
+        "I can apply copyright and licenses to digital content I create."
+    ],
+    "Information Processing": [
+        "I can evaluate the reliability of digital information sources.",
+        "I know how to search for and filter data, information, and content.",
+        "I can organize and store digital information efficiently."
+    ]
+}
 
 # Initialize LangChain models
 def load_llm():
@@ -176,3 +206,25 @@ def generate_chat_response(query, persona_context, max_tokens=None):
 def get_sample_statements():
     """Returns the list of sample statements"""
     return SAMPLE_STATEMENTS
+
+def get_statements_from_settings():
+    """Returns statements based on user settings"""
+    if 'user_settings' not in st.session_state:
+        return get_sample_statements()
+    
+    # Get individually selected statements
+    selected_statements = st.session_state.user_settings.get("selected_statements", [])
+    
+    # Add custom statements
+    if "custom_statements" in st.session_state.user_settings:
+        selected_statements.extend(st.session_state.user_settings["custom_statements"])
+    
+    # If no statements selected, return sample statements
+    if not selected_statements:
+        return get_sample_statements()
+    
+    return selected_statements
+
+def get_statement_categories():
+    """Returns the dictionary of statement categories"""
+    return STATEMENT_CATEGORIES
