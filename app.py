@@ -7,13 +7,26 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Import service functions
-from service import (
+from services.service import (
     load_llm, 
     load_embedding_model, 
-    enrich_statement_with_llm, 
-    calculate_quality_metrics, 
+    enrich_statement_with_llm,
+    calculate_quality_metrics,
+    get_sample_statements,
+    get_statements_from_settings,
+    get_all_statements,
     generate_chat_response,
-    get_sample_statements
+    save_chat_message,
+    get_chat_history,
+    save_statement,
+    get_user_statements,
+    save_quiz_results,
+    get_quiz_results,
+    save_profile,
+    get_profile,
+    get_global_settings,
+    save_global_settings,
+    get_user_by_id
 )
 
 # Import page display functions
@@ -26,101 +39,171 @@ from pages.chatbot import display_chatbot
 from pages.analytics import display_analytics
 from pages.user_flow import display_user_flow
 from pages.user_settings import display_user_settings
+from pages.prompt_engineer import display_prompt_engineer
 
 def run_app():
-    # Debug information
-    print("DEBUG: Starting run_app() function")
-    
-    # Initialize session state
+    # Get sample statements before page routing
+    sample_statements = get_sample_statements()
+
+    # Initialize session state for authentication if not exists
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+        st.session_state.current_role = None
+        st.session_state.user = None
+
+    # Try to restore session from query params if not authenticated
+    if not st.session_state.authenticated:
+        try:
+            # Get user_id from query params
+            user_id = st.query_params.get('user_id')
+            
+            if user_id:
+                # Try to get user from database
+                user = get_user_by_id(int(user_id))
+                if user:
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.session_state.current_role = user["role"]
+        except Exception as e:
+            print(f"Error restoring session: {e}")
+
+    # Check authentication
+    if not st.session_state.authenticated:
+        from pages.auth import display_auth
+        display_auth()
+        return
+
+    # Initialize user data if not exists
     if 'user' not in st.session_state:
         st.session_state.user = {
             "id": 1,
             "username": "demo_user",
-            "role": "user"
+            "role": st.session_state.current_role
         }
-        print("DEBUG: Initialized user session state")
 
+    # Load user profile from database
     if 'profile' not in st.session_state:
-        st.session_state.profile = {
-            "job_role": "Frontend developer",
-            "job_domain": "IT Development",
-            "years_experience": 4,
-            "digital_proficiency": "Intermediate",
-            "primary_tasks": "Working with Figma, creating responsive SCSS styles and creating components in Angular"
-        }
+        user_profile = get_profile(st.session_state.user["id"])
+        if user_profile:
+            st.session_state.profile = user_profile
+        else:
+            st.session_state.profile = {
+                "job_role": "",
+                "job_domain": "",
+                "years_experience": 0,
+                "digital_proficiency": "Intermediate",
+                "primary_tasks": ""
+            }
 
+    # Load user statements from database
     if 'enriched_statements' not in st.session_state:
-        st.session_state.enriched_statements = []
+        user_statements = get_user_statements(st.session_state.user["id"])
+        if user_statements:
+            st.session_state.enriched_statements = user_statements
+        else:
+            st.session_state.enriched_statements = []
         
+    # Load quiz results from database
     if 'quiz_results' not in st.session_state:
-        st.session_state.quiz_results = {"original": 0, "enriched": 0}
+        user_quiz_results = get_quiz_results(st.session_state.user["id"])
+        if user_quiz_results:
+            st.session_state.quiz_results = {
+                "original": user_quiz_results["original"],
+                "enriched": user_quiz_results["enriched"]
+            }
+            st.session_state.detailed_quiz_results = user_quiz_results["detailed_results"]
+            
+            # Set quiz_completed flag based on whether there are any results
+            total_responses = user_quiz_results["original"] + user_quiz_results["enriched"]
+            st.session_state.quiz_completed = total_responses > 0
+        else:
+            st.session_state.quiz_results = {"original": 0, "enriched": 0}
+            st.session_state.detailed_quiz_results = {
+                "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "read": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "detail": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
+            }
+            st.session_state.quiz_completed = False
 
-    # Add detailed quiz results structure
-    if 'detailed_quiz_results' not in st.session_state:
-        st.session_state.detailed_quiz_results = {
-            "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "read": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "detail": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
-        }
-
+    # Initialize chat history if not exists
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
 
-    # Initialize user settings if not exists
+    # Load global user settings
     if 'user_settings' not in st.session_state:
-        st.session_state.user_settings = {
-            "selected_categories": [],
-            "custom_statements": [],
-            "max_statements_per_quiz": 5
-        }
+        global_settings = get_global_settings("user_settings")
+        if global_settings:
+            st.session_state.user_settings = global_settings
+        else:
+            st.session_state.user_settings = {
+                "selected_categories": [],
+                "custom_statements": [],
+                "max_statements_per_quiz": 5
+            }
 
-    # Get sample statements
-    sample_statements = get_sample_statements()
-
-    # Sidebar navigation
-    st.sidebar.title("DigiBot Demo")
-    page = st.sidebar.radio(
-        "Navigation",
-        ["Home", "User Journey", "Profile Builder", "User Settings", "Enrichment Demo", "Batch Enrichment", "Quiz", "Chatbot", "Analytics"]
-    )
-
-    # Home page
-    if page == "Home":
-        display_home_page()
-
-    # User Journey page
-    elif page == "User Journey":
-        display_user_flow()
-
-    # Profile Builder page
-    elif page == "Profile Builder":
-        display_profile_builder()
-
-    # User Settings page
-    elif page == "User Settings":
-        display_user_settings()
-
-    # Enrichment Demo page
-    elif page == "Enrichment Demo":
-        display_enrichment_demo(sample_statements)
-
-    # Batch Enrichment page
-    elif page == "Batch Enrichment":
-        display_batch_enrichment(sample_statements)
+    # Sidebar navigation based on role
+    st.sidebar.title("Digibot")
     
-    # Quiz page
-    elif page == "Quiz":
-        display_quiz()
+    # Show role indicator and logout button
+    st.sidebar.success(f"Logged in as {st.session_state.user['username']} ({st.session_state.current_role})")
+    if st.sidebar.button("Logout"):
+        # Clear authentication first
+        st.session_state.authenticated = False
+        st.session_state.current_role = None
+        st.session_state.user = None
+        
+        # Clear remaining session state
+        for key in list(st.session_state.keys()):
+            if key not in ['authenticated', 'current_role', 'user']:
+                del st.session_state[key]
+                
+        # Force redirect to auth page
+        st.query_params.clear()
+        st.rerun()
+    
+    # Navigation based on role
+    if st.session_state.current_role == "admin":
+        page = st.sidebar.radio(
+            "Navigation",
+            ["Home", "User Settings", "User Journey", "Profile Builder", 
+             "Enrichment Demo", "Batch Enrichment", "Quiz", "Chatbot", "Analytics", "Prompt Engineer"]
+        )
+    else:
+        page = "User Journey"
+    
+    # Page routing
+    if page == "User Journey":
+        display_user_flow()
+    elif st.session_state.current_role == "admin":
+        if page == "Home":
+            display_home_page()
+        elif page == "User Settings":
+            display_user_settings()
+        elif page == "Profile Builder":
+            display_profile_builder()
+        elif page == "Enrichment Demo":
+            display_enrichment_demo(sample_statements)
+        elif page == "Batch Enrichment":
+            display_batch_enrichment(sample_statements)
+        elif page == "Quiz":
+            display_quiz()
+        elif page == "Chatbot":
+            display_chatbot()
+        elif page == "Analytics":
+            display_analytics()
+        elif page == "Prompt Engineer":
+            display_prompt_engineer(sample_statements)
 
-    # Chatbot page
-    elif page == "Chatbot":
-        display_chatbot()
-
-    # Analytics page
-    elif page == "Analytics":
-        display_analytics()
+    # Save quiz results to database when session ends
+    if 'quiz_results' in st.session_state:
+        save_quiz_results(
+            st.session_state.user["id"],
+            st.session_state.quiz_results["original"],
+            st.session_state.quiz_results["enriched"],
+            st.session_state.detailed_quiz_results
+        )
 
     # Add footer
     st.markdown("---")

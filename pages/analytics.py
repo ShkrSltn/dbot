@@ -3,190 +3,231 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+from services.db.crud._quiz import get_quiz_results_all_users
 
 def display_analytics():
     st.title("📊 Analytics Dashboard")
     
-    if len(st.session_state.enriched_statements) < 1:
-        st.warning("No enriched statements available for analysis.")
-        st.info("Go to the Enrichment Demo or Batch Enrichment page to create more statements.")
+    # Get aggregated quiz results for all users
+    all_quiz_results = get_quiz_results_all_users()
+    
+    if not all_quiz_results:
+        st.warning("No quiz results available for analysis.")
+        st.info("Users need to complete quizzes to generate analytics.")
         st.stop()
-        
-    # Prepare data for visualization
-    data = []
-    for i, item in enumerate(st.session_state.enriched_statements):
-        data.append({
-            "id": i + 1,
-            "original": item["original"],
-            "enriched": item["enriched"],
-            "original_length": len(item["original"]),
-            "enriched_length": len(item["enriched"]),
-            "tfidf_similarity": item["metrics"]["cosine_tfidf"],
-            "embedding_similarity": item["metrics"]["cosine_embedding"],
-            "reading_ease": item["metrics"]["readability"]["estimated_reading_ease"],
-            "word_count": item["metrics"]["readability"]["word_count"],
-            "avg_word_length": item["metrics"]["readability"]["avg_word_length"]
-        })
     
-    df = pd.DataFrame(data)
+    # Aggregate the results
+    total_original = sum(result["original"] for result in all_quiz_results)
+    total_enriched = sum(result["enriched"] for result in all_quiz_results)
+    total_responses = total_original + total_enriched
     
-    # Create tabs for different visualizations
-    viz_tabs = st.tabs(["Overview", "Statement Comparison", "Quiz Results"])
+    # Aggregate detailed results
+    aggregated_detailed_results = {
+        "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+        "read": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+        "detail": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+        "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+        "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
+    }
     
-    with viz_tabs[0]:
-        # Overview metrics
-        st.subheader("Overview Metrics")
+    for result in all_quiz_results:
+        detailed = result["detailed_results"]
+        for criterion in aggregated_detailed_results:
+            for preference in aggregated_detailed_results[criterion]:
+                aggregated_detailed_results[criterion][preference] += detailed[criterion][preference]
+
+    # Display overall results
+    st.subheader("Overall Statement Preferences")
+    
+    if total_responses > 0:
+        original_percentage = (total_original / total_responses) * 100
+        enriched_percentage = (total_enriched / total_responses) * 100
         
-        # Summary statistics
-        col1, col2, col3 = st.columns(3)
+        # Create donut chart
+        fig = go.Figure(data=[go.Pie(
+            labels=["Original Statements", "Personalized Statements"],
+            values=[total_original, total_enriched],
+            hole=.4,
+            marker=dict(colors=['#3498db', '#ff7675']),
+            textinfo='label+percent',
+            textposition='outside',
+            pull=[0.1 if original_percentage > enriched_percentage else 0, 
+                  0 if original_percentage > enriched_percentage else 0.1],
+            hoverinfo='label+value+percent'
+        )])
         
-        with col1:
-            st.metric("Total Statements", len(df))
-            
-        with col2:
-            avg_similarity = df["embedding_similarity"].mean()
-            st.metric("Avg. Embedding Similarity", f"{avg_similarity:.2f}")
-            
-        with col3:
-            avg_reading_ease = df["reading_ease"].mean()
-            st.metric("Avg. Reading Ease", f"{avg_reading_ease:.1f}")
-        
-        # Create a correlation heatmap
-        st.subheader("Correlation Matrix")
-        
-        # Select numeric columns for correlation
-        numeric_cols = ["original_length", "enriched_length", "tfidf_similarity", 
-                        "embedding_similarity", "reading_ease", "word_count", "avg_word_length"]
-        
-        corr_matrix = df[numeric_cols].corr()
-        
-        # Create a heatmap using Plotly
-        fig = px.imshow(
-            corr_matrix,
-            text_auto=True,
-            aspect="auto",
-            color_continuous_scale="RdBu_r",
-            title="Correlation Between Metrics"
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Length comparison
-        st.subheader("Statement Length Comparison")
-        
-        # Create a scatter plot
-        fig = px.scatter(
-            df,
-            x="original_length",
-            y="enriched_length",
-            size="embedding_similarity",
-            color="reading_ease",
-            hover_name="id",
-            labels={
-                "original_length": "Original Length (chars)",
-                "enriched_length": "Enriched Length (chars)",
-                "embedding_similarity": "Embedding Similarity",
-                "reading_ease": "Reading Ease"
+        fig.update_layout(
+            title={
+                'text': "Statement Preference Distribution",
+                'y': 0.95,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'
             },
-            title="Original vs. Enriched Statement Length"
-        )
-        
-        # Add a diagonal line for reference
-        fig.add_shape(
-            type="line",
-            x0=min(df["original_length"]),
-            y0=min(df["original_length"]),
-            x1=max(df["original_length"]),
-            y1=max(df["original_length"]),
-            line=dict(color="gray", dash="dash")
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.2,
+                xanchor="center",
+                x=0.5
+            ),
+            height=500,
+            margin=dict(t=80, b=80, l=40, r=40),
+            annotations=[dict(
+                text=f'Total Responses: {total_responses}',
+                x=0.5, y=0.5,
+                font_size=20,
+                showarrow=False
+            )]
         )
         
         st.plotly_chart(fig, use_container_width=True)
         
-    with viz_tabs[1]:
-        # Statement comparison
-        st.subheader("Statement Comparison")
-        selected_id = st.selectbox("Select a statement to view details:", df["id"].tolist())
-
-        if selected_id:
-            idx = selected_id - 1
-            selected_item = st.session_state.enriched_statements[idx]
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.markdown("### Original Statement")
-                st.info(selected_item["original"])
-
-            with col2:
-                st.markdown("### Enriched Statement")
-                st.success(selected_item["enriched"])
-
-            # Display detailed metrics
-            st.markdown("### Detailed Metrics")
-            metrics_df = pd.DataFrame([{
-                "Metric": key,
-                "Value": value
-            } for key, value in selected_item["metrics"]["readability"].items()])
-
-            st.dataframe(metrics_df)
-            
-    with viz_tabs[2]:
-        # Quiz results visualization
-        st.subheader("Quiz Preference Results")
+        # Detailed Analysis
+        st.subheader("Detailed Analysis by Criteria")
         
-        total_responses = st.session_state.quiz_results["original"] + st.session_state.quiz_results["enriched"]
+        # Create tabs for detailed analysis
+        detailed_tabs = st.tabs(["Understanding", "Readability", "Detail", "Professional Fit", "Self-Assessment"])
         
-        if total_responses == 0:
-            st.info("No quiz results available yet. Take the quiz to see your preferences.")
-        else:
-            original_percentage = (st.session_state.quiz_results["original"] / total_responses) * 100
-            enriched_percentage = (st.session_state.quiz_results["enriched"] / total_responses) * 100
+        criteria_names = {
+            "understand": "Which statement is easier to understand?",
+            "read": "Which statement is easier to read?",
+            "detail": "Which statement offers greater detail?",
+            "profession": "Which statement fits profession better?",
+            "assessment": "Which statement is more helpful for self-assessment?"
+        }
+        
+        criteria_keys = ["understand", "read", "detail", "profession", "assessment"]
+        
+        for tab, key in zip(detailed_tabs, criteria_keys):
+            with tab:
+                categories = [
+                    "Completely prefer orig.",
+                    "Somewhat prefer orig.",
+                    "Neither",
+                    "Somewhat prefer pers.",
+                    "Completely prefer pers."
+                ]
+                
+                values = [
+                    aggregated_detailed_results[key]["completely_prefer_original"],
+                    aggregated_detailed_results[key]["somewhat_prefer_original"],
+                    aggregated_detailed_results[key]["neither"],
+                    aggregated_detailed_results[key]["somewhat_prefer_enriched"],
+                    aggregated_detailed_results[key]["completely_prefer_enriched"]
+                ]
+                
+                # Calculate tendency
+                total_responses = sum(values)
+                if total_responses > 0:
+                    weighted_sum = (values[0] * -2 + values[1] * -1 + values[2] * 0 +
+                                 values[3] * 1 + values[4] * 2)
+                    tendency = weighted_sum / total_responses
+                    tendency_position = (tendency + 2) / 4 * 4
+                else:
+                    tendency_position = 2
+                
+                # Create bar chart
+                fig = go.Figure()
+                
+                fig.add_trace(go.Bar(
+                    x=categories,
+                    y=values,
+                    text=values,
+                    textposition='auto',
+                    marker_color=['#3498db', '#74b9ff', '#e0e0e0', '#ffb8b8', '#ff7675'],
+                    hoverinfo='y+text'
+                ))
+                
+                # Add tendency line
+                if total_responses > 0:
+                    fig.add_shape(
+                        type="line",
+                        x0=tendency_position,
+                        y0=0,
+                        x1=tendency_position,
+                        y1=max(values) * 1.1 if max(values) > 0 else 10,
+                        line=dict(
+                            color="red",
+                            width=2,
+                            dash="dash",
+                        )
+                    )
+                    
+                    # Add tendency annotation
+                    if tendency < -1:
+                        tendency_text = "Strong preference for original statements"
+                    elif tendency < 0:
+                        tendency_text = "Slight preference for original statements"
+                    elif tendency == 0:
+                        tendency_text = "No preference"
+                    elif tendency < 1:
+                        tendency_text = "Slight preference for personalized statements"
+                    else:
+                        tendency_text = "Strong preference for personalized statements"
+                        
+                    fig.add_annotation(
+                        x=tendency_position,
+                        y=max(values) * 1.05 if max(values) > 0 else 5,
+                        text=tendency_text,
+                        showarrow=True,
+                        arrowhead=1,
+                        ax=0,
+                        ay=-40
+                    )
+                
+                fig.update_layout(
+                    title=criteria_names[key],
+                    xaxis=dict(
+                        title="Preference",
+                        tickangle=-45
+                    ),
+                    yaxis=dict(
+                        title="Number of Responses"
+                    ),
+                    height=400,
+                    margin=dict(t=80, b=120, l=40, r=40)
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+        
+        # Overall interpretation
+        st.subheader("Overall Interpretation")
+        
+        overall_tendency = 0
+        total_weights = 0
+        
+        for key in criteria_keys:
+            values = [
+                aggregated_detailed_results[key]["completely_prefer_original"],
+                aggregated_detailed_results[key]["somewhat_prefer_original"],
+                aggregated_detailed_results[key]["neither"],
+                aggregated_detailed_results[key]["somewhat_prefer_enriched"],
+                aggregated_detailed_results[key]["completely_prefer_enriched"]
+            ]
             
-            # Create interactive pie chart with Plotly
-            labels = ["Original Statements", "Personalized Statements"]
-            values = [st.session_state.quiz_results["original"], st.session_state.quiz_results["enriched"]]
+            total = sum(values)
+            if total > 0:
+                weighted_sum = (values[0] * -2 + values[1] * -1 + values[2] * 0 +
+                             values[3] * 1 + values[4] * 2)
+                tendency = weighted_sum / total
+                overall_tendency += tendency * total
+                total_weights += total
+        
+        if total_weights > 0:
+            overall_tendency = overall_tendency / total_weights
             
-            # Define colors
-            colors = ['#3498db', '#ff7675']
-            
-            # Create figure
-            fig = go.Figure(data=[go.Pie(
-                labels=labels,
-                values=values,
-                hole=.4,  # Creates a donut chart
-                marker=dict(colors=colors),
-                textinfo='label+percent',
-                textposition='outside',
-                pull=[0.1 if original_percentage > enriched_percentage else 0, 
-                      0 if original_percentage > enriched_percentage else 0.1],
-                hoverinfo='label+value+percent'
-            )])
-            
-            # Update layout
-            fig.update_layout(
-                title={
-                    'text': "Statement Preference Distribution",
-                    'y':0.95,
-                    'x':0.5,
-                    'xanchor': 'center',
-                    'yanchor': 'top'
-                },
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=-0.2,
-                    xanchor="center",
-                    x=0.5
-                ),
-                height=500,
-                margin=dict(t=80, b=80, l=40, r=40),
-                annotations=[dict(
-                    text=f'Total: {total_responses}',
-                    x=0.5, y=0.5,
-                    font_size=20,
-                    showarrow=False
-                )]
-            )
-            
-            st.plotly_chart(fig, use_container_width=True) 
+            if overall_tendency < -1:
+                st.info("Overall, users have a strong preference for original statements. They prefer clearer, more concise language.")
+            elif overall_tendency < -0.5:
+                st.info("Overall, users have a moderate preference for original statements. They seem to value clarity and directness.")
+            elif overall_tendency < 0:
+                st.info("Overall, users have a slight preference for original statements, but also appreciate some personalization.")
+            elif overall_tendency == 0:
+                st.info("Overall, users have no strong preference between original and personalized statements.")
+            elif overall_tendency < 0.5:
+                st.info("Overall, users have a slight preference for personalized statements, but also value clarity.")
+            elif overall_tendency < 1:
+                st.info("Overall, users have a moderate preference for personalized statements. They appreciate context and detail.")
+            else:
+                st.info("Overall, users have a strong preference for personalized statements. They value detailed, contextual information.") 

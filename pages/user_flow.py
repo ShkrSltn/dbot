@@ -3,7 +3,12 @@ import numpy as np
 import plotly.graph_objects as go
 from pages.profile_builder import display_profile_builder
 from pages.quiz import display_quiz
-from service import get_statements_from_settings
+from services.statement_service import get_statements_from_settings
+from services.enrichment_service import enrich_statement_with_llm
+from services.metrics_service import calculate_quality_metrics
+from services.db.crud._profiles import save_profile, get_profile
+from services.db.crud._quiz import save_quiz_results, get_quiz_results, get_quiz_results_list
+from services.db.crud._statements import get_user_statements
 
 def display_user_flow():
     st.title("🚶 User Journey")
@@ -11,6 +16,36 @@ def display_user_flow():
     # Initialize flow state if not exists
     if 'flow_step' not in st.session_state:
         st.session_state.flow_step = 1
+    
+    # Try to load existing profile from database
+    if 'profile' not in st.session_state:
+        db_profile = get_profile(st.session_state.user["id"])
+        if db_profile:
+            st.session_state.profile = db_profile
+    
+    # Try to load existing quiz results from database
+    if 'quiz_results' not in st.session_state:
+        db_quiz_results_list = get_quiz_results_list(st.session_state.user["id"])
+        if db_quiz_results_list:
+            # Initialize with empty results for new attempt
+            st.session_state.quiz_results = {"original": 0, "enriched": 0}
+            st.session_state.detailed_quiz_results = {
+                "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "read": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "detail": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
+                "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
+            }
+            st.session_state.previous_quiz_results = db_quiz_results_list
+            st.session_state.has_previous_results = True
+        else:
+            st.session_state.has_previous_results = False
+    
+    # Load user statements from database
+    if 'enriched_statements' not in st.session_state:
+        user_statements = get_user_statements(st.session_state.user["id"])
+        if user_statements:
+            st.session_state.enriched_statements = user_statements
     
     # Display progress bar
     steps = ["Profile", "Quiz", "Results"]
@@ -48,18 +83,18 @@ def display_user_flow():
             col1, col2 = st.columns(2)
 
             with col1:
-                job_role = st.text_input("Job Role", value=st.session_state.profile["job_role"])
-                job_domain = st.text_input("Job Domain", value=st.session_state.profile["job_domain"])
+                job_role = st.text_input("Job Role", value=st.session_state.profile.get("job_role", ""))
+                job_domain = st.text_input("Job Domain", value=st.session_state.profile.get("job_domain", ""))
                 years_experience = st.number_input("Years of Experience", min_value=0, max_value=50,
-                                                   value=st.session_state.profile["years_experience"])
+                                                   value=st.session_state.profile.get("years_experience", 0))
 
             with col2:
                 digital_proficiency = st.select_slider(
                     "Digital Proficiency",
                     options=["Beginner", "Intermediate", "Advanced", "Expert"],
-                    value=st.session_state.profile["digital_proficiency"]
+                    value=st.session_state.profile.get("digital_proficiency", "Intermediate")
                 )
-                primary_tasks = st.text_area("Primary Tasks", value=st.session_state.profile["primary_tasks"])
+                primary_tasks = st.text_area("Primary Tasks", value=st.session_state.profile.get("primary_tasks", ""))
 
             submit_button = st.form_submit_button("Save Profile & Continue")
 
@@ -68,18 +103,22 @@ def display_user_flow():
                 if not job_role or not job_domain or not primary_tasks:
                     st.error("Please fill in all required fields.")
                 else:
-                    st.session_state.profile = {
+                    # Create profile data dictionary
+                    profile_data = {
                         "job_role": job_role,
                         "job_domain": job_domain,
                         "years_experience": years_experience,
                         "digital_proficiency": digital_proficiency,
                         "primary_tasks": primary_tasks
                     }
-                    st.success("Profile saved successfully!")
                     
-                    # Move to next step
-                    st.session_state.flow_step = 2
-                    st.rerun()
+                    # Save to database
+                    if save_profile(st.session_state.user["id"], profile_data):
+                        st.session_state.profile = profile_data
+                        st.session_state.flow_step = 2
+                        st.rerun()
+                    else:
+                        st.error("Failed to save profile to database. Please try again.")
     
     # Step 2: Quiz
     elif st.session_state.flow_step == 2:
@@ -87,12 +126,9 @@ def display_user_flow():
         
         # Check if we have enriched statements
         if len(st.session_state.enriched_statements) < 1:
-            st.warning("No enriched statements available for the quiz.")
             
             # Generate some sample enriched statements for testing
-            if st.button("Generate Sample Statements for Quiz"):
-                from service import enrich_statement_with_llm, calculate_quality_metrics
-                
+            if st.button("Let's start the quiz"):
                 # Get statements based on user settings
                 sample_statements = get_statements_from_settings()
                 
@@ -140,6 +176,14 @@ def display_user_flow():
                 statement_idx = np.random.choice(available_indices)
                 statement_pair = st.session_state.enriched_statements[statement_idx]
                 
+                # Create a unique key for this quiz iteration to ensure form elements reset
+                if 'current_quiz_iteration' not in st.session_state:
+                    st.session_state.current_quiz_iteration = 0
+                else:
+                    st.session_state.current_quiz_iteration += 1
+                
+                quiz_iteration_key = f"quiz_iteration_{st.session_state.current_quiz_iteration}"
+                
                 # Randomize the order of presentation
                 if np.random.random() > 0.5:
                     first_statement = statement_pair["original"]
@@ -185,15 +229,17 @@ def display_user_flow():
                     
                     # Create sliders for each criterion
                     for key, question in criteria.items():
+                        # Используем уникальный ключ для каждого слайдера, включающий индекс итерации
+                        slider_key = f"{quiz_iteration_key}_{key}"
                         responses[key] = st.select_slider(
                             question,
                             options=["Completely Prefer A", "Somewhat Prefer A", "Neither", "Somewhat Prefer B", "Completely Prefer B"],
-                            value="Neither",
-                            key=f"flow_{key}"
+                            value=None,
+                            key=slider_key
                         )
                     
                     # Progress indicator
-                    total_statements = min(5, len(st.session_state.enriched_statements))  # Limit to 5 statements max
+                    total_statements = min(10, len(st.session_state.enriched_statements))  # Limit to 5 statements max
                     completed = len(st.session_state.quiz_shown_indices)
                     progress_percentage = completed / total_statements * 100
                     
@@ -264,6 +310,18 @@ def display_user_flow():
                     if len(st.session_state.quiz_shown_indices) >= min(max_statements, len(st.session_state.enriched_statements)):
                         st.session_state.flow_step = 3
                     
+                    # Save quiz results to database after each submission
+                    save_quiz_results(
+                        st.session_state.user["id"],
+                        st.session_state.quiz_results["original"],
+                        st.session_state.quiz_results["enriched"],
+                        st.session_state.detailed_quiz_results
+                    )
+                    
+                    # Update the list of previous results
+                    st.session_state.previous_quiz_results = get_quiz_results_list(st.session_state.user["id"])
+                    st.session_state.has_previous_results = True
+                    
                     # Rerun to show the next question or move to results
                     st.rerun()
     
@@ -271,7 +329,26 @@ def display_user_flow():
     elif st.session_state.flow_step == 3:
         st.subheader("Step 3: Your Results")
         
-        total_responses = st.session_state.quiz_results["original"] + st.session_state.quiz_results["enriched"]
+        # Add dropdown for selecting previous results if they exist
+        selected_result = None
+        if st.session_state.has_previous_results:
+            st.markdown("### View Previous Results")
+            result_options = [f"Attempt {i+1}" for i in range(len(st.session_state.previous_quiz_results))]
+            result_options.append("Current Attempt")
+            selected_attempt = st.selectbox("Select attempt to view:", result_options)
+            
+            if selected_attempt != "Current Attempt":
+                attempt_index = int(selected_attempt.split()[-1]) - 1
+                selected_result = st.session_state.previous_quiz_results[attempt_index]
+        
+        # Use either selected previous result or current results
+        display_results = selected_result if selected_result else {
+            "original": st.session_state.quiz_results["original"],
+            "enriched": st.session_state.quiz_results["enriched"],
+            "detailed_results": st.session_state.detailed_quiz_results
+        }
+
+        total_responses = display_results["original"] + display_results["enriched"]
         
         if total_responses == 0:
             st.warning("No quiz results available. Please complete the quiz first.")
@@ -281,12 +358,12 @@ def display_user_flow():
             # Display results summary
             st.markdown("### Your Statement Preferences")
             
-            original_percentage = (st.session_state.quiz_results["original"] / total_responses) * 100
-            enriched_percentage = (st.session_state.quiz_results["enriched"] / total_responses) * 100
+            original_percentage = (display_results["original"] / total_responses) * 100
+            enriched_percentage = (display_results["enriched"] / total_responses) * 100
             
             # Create interactive pie chart with Plotly
             labels = ["Original Statements", "Personalized Statements"]
-            values = [st.session_state.quiz_results["original"], st.session_state.quiz_results["enriched"]]
+            values = [display_results["original"], display_results["enriched"]]
             
             # Define colors
             colors = ['#3498db', '#ff7675']
@@ -336,11 +413,11 @@ def display_user_flow():
             for i, (tab, key) in enumerate(zip(detailed_tabs, criteria_keys)):
                 with tab:
                     values = [
-                        st.session_state.detailed_quiz_results[key]["completely_prefer_original"],
-                        st.session_state.detailed_quiz_results[key]["somewhat_prefer_original"],
-                        st.session_state.detailed_quiz_results[key]["neither"],
-                        st.session_state.detailed_quiz_results[key]["somewhat_prefer_enriched"],
-                        st.session_state.detailed_quiz_results[key]["completely_prefer_enriched"]
+                        display_results["detailed_results"][key]["completely_prefer_original"],
+                        display_results["detailed_results"][key]["somewhat_prefer_original"],
+                        display_results["detailed_results"][key]["neither"],
+                        display_results["detailed_results"][key]["somewhat_prefer_enriched"],
+                        display_results["detailed_results"][key]["completely_prefer_enriched"]
                     ]
                     
                     total = sum(values)
@@ -450,7 +527,7 @@ def display_user_flow():
             
             # Option to restart the quiz
             if st.button("Restart Assessment"):
-                # Reset quiz results
+                # Reset quiz results in both session and database
                 st.session_state.quiz_results = {"original": 0, "enriched": 0}
                 st.session_state.detailed_quiz_results = {
                     "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
@@ -459,6 +536,11 @@ def display_user_flow():
                     "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
                     "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
                 }
+                save_quiz_results(
+                    st.session_state.user["id"],
+                    0, 0,
+                    st.session_state.detailed_quiz_results
+                )
                 st.session_state.quiz_shown_indices = []
                 st.session_state.flow_step = 1
                 st.rerun() 

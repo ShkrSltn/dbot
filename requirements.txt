@@ -21,3 +21,6 @@ textstat>=0.7.0
 
 # HTTP requests
 requests>=2.31.0
+
+# Database
+psycopg2-binary>=2.9.0

@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
-from service import enrich_statement_with_llm, calculate_quality_metrics
+from services.enrichment_service import enrich_statement_with_llm
+from services.metrics_service import calculate_quality_metrics
+from services.db.crud._statements import save_statement
 
 def display_enrichment_demo(sample_statements):
     st.title("✨ Enrichment Demo")
@@ -63,12 +65,24 @@ def display_enrichment_demo(sample_statements):
                 print(f"DEBUG: Metrics calculated: {metrics}")
 
                 # Save to session state
-                st.session_state.enriched_statements.append({
+                statement_data = {
                     "original": original_statement,
                     "enriched": enriched_statement,
                     "metrics": metrics
-                })
-                print("DEBUG: Added to session state")
+                }
+                
+                st.session_state.enriched_statements.append(statement_data)
+                
+                # Сохраняем в базу данных
+                statement_id = save_statement(
+                    st.session_state.user["id"],
+                    original_statement,
+                    enriched_statement,
+                    metrics
+                )
+                
+                if statement_id:
+                    st.success(f"Statement saved to database with ID: {statement_id}")
 
             # Display results
             print("DEBUG: Displaying results")

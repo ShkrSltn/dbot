@@ -1,6 +1,8 @@
 import streamlit as st
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
+from services.db.crud._quiz import save_quiz_results 
 
 def display_quiz():
     st.title("🧠 Statement Preference Quiz")
@@ -12,7 +14,7 @@ def display_quiz():
         
     st.markdown("""
     This quiz helps us understand your preferences between original and enriched statements.
-    For each pair, evaluate the statements based on different criteria.
+    For each pair, evaluate the statements based on different criteria. 
     """)
     
     # Select a random statement that hasn't been shown in the quiz yet
@@ -81,6 +83,14 @@ def display_quiz():
             
             # Display the chart
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Save quiz results to database
+            save_quiz_results(
+                st.session_state.user["id"],
+                st.session_state.quiz_results["original"],
+                st.session_state.quiz_results["enriched"],
+                st.session_state.detailed_quiz_results
+            )
             
             # Create detailed analysis charts
             st.subheader("Detailed Analysis by Criteria")
@@ -222,23 +232,22 @@ def display_quiz():
                 overall_tendency = overall_tendency / total_weights
                 
                 if overall_tendency < -1:
-                    st.info("Overall, you show a strong preference for personalized statements across most criteria.")
+                    st.info("Overall, you have a strong preference for original statements. You might prefer clearer, more concise language.")
                 elif overall_tendency < -0.5:
-                    st.info("Overall, you show a moderate preference for personalized statements.")
+                    st.info("Overall, you have a moderate preference for original statements. You seem to value clarity and directness.")
                 elif overall_tendency < 0:
-                    st.info("Overall, you show a slight preference for personalized statements.")
+                    st.info("Overall, you have a slight preference for original statements, but you also appreciate some personalization.")
                 elif overall_tendency == 0:
-                    st.info("Overall, you show no clear preference between original and personalized statements.")
+                    st.info("Overall, you have no strong preference between original and personalized statements.")
                 elif overall_tendency < 0.5:
-                    st.info("Overall, you show a slight preference for original statements.")
+                    st.info("Overall, you have a slight preference for personalized statements, but you also value clarity.")
                 elif overall_tendency < 1:
-                    st.info("Overall, you show a moderate preference for original statements.")
+                    st.info("Overall, you have a moderate preference for personalized statements. You appreciate context and detail.")
                 else:
-                    st.info("Overall, you show a strong preference for original statements across most criteria.")
-        
+                    st.info("Overall, you have a strong preference for personalized statements. You value detailed, contextual information.")
+            
         # Option to reset quiz
-        if st.button("Reset Quiz"):
-            st.session_state.quiz_shown_indices = []
+        if st.button("Reset Quiz Results"):
             st.session_state.quiz_results = {"original": 0, "enriched": 0}
             st.session_state.detailed_quiz_results = {
                 "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
@@ -247,128 +256,137 @@ def display_quiz():
                 "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
                 "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
             }
-            st.rerun()
+            st.session_state.quiz_shown_indices = []
             
-        st.stop()
+            # Save reset quiz results to database
+            save_quiz_results(
+                st.session_state.user["id"],
+                0, 0,
+                st.session_state.detailed_quiz_results
+            )
+            
+            st.success("Quiz results have been reset!")
+            st.rerun()
         
+        return
+    
     # Select a random statement
     statement_idx = np.random.choice(available_indices)
     statement_pair = st.session_state.enriched_statements[statement_idx]
     
-    # Randomize the order of presentation
-    if np.random.random() > 0.5:
-        first_statement = statement_pair["original"]
-        second_statement = statement_pair["enriched"]
-        first_is_original = True
-    else:
-        first_statement = statement_pair["enriched"]
-        second_statement = statement_pair["original"]
-        first_is_original = False
-        
-    st.subheader("Select your preferred statement:")
+    # Randomly decide which statement to show first
+    first_is_original = np.random.random() > 0.5
     
-    # Display the statements side by side
+    if first_is_original:
+        statement_a = statement_pair["original"]
+        statement_b = statement_pair["enriched"]
+    else:
+        statement_a = statement_pair["enriched"]
+        statement_b = statement_pair["original"]
+    
+    # Display the statements
+    st.subheader("Compare these statements:")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### A")
-        st.info(first_statement)
+        st.markdown("### Statement A")
+        st.info(statement_a)
         
     with col2:
-        st.markdown("### B")
-        st.info(second_statement)
+        st.markdown("### Statement B")
+        st.success(statement_b)
+    
+    # Create form for evaluation
+    with st.form("quiz_form"):
+        st.markdown("### Evaluate the statements on these criteria:")
         
-    # Add a divider
-    st.markdown("---")
-    
-    # Create the detailed preference form
-    st.markdown("### Your Preference")
-    
-    # Define the criteria questions
-    criteria = {
-        "understand": "Which statement is easier to understand?",
-        "read": "Which statement is easier to read?",
-        "detail": "Which statement offers greater detail?",
-        "profession": "Which statement fits your profession?",
-        "assessment": "Which statement is helpful for a self-assessment?"
-    }
-    
-    # Create a form for all criteria
-    with st.form("preference_form"):
-        # Store the responses
+        # Create a dictionary to store responses
         responses = {}
         
-        # Create sliders for each criterion
-        for key, question in criteria.items():
-            responses[key] = st.select_slider(
-                question,
-                options=["Completely Prefer A", "Somewhat Prefer A", "Neither", "Somewhat Prefer B", "Completely Prefer B"],
-                value="Neither"
-            )
-        
-        # Progress indicator
-        total_statements = len(st.session_state.enriched_statements)
-        completed = len(st.session_state.quiz_shown_indices)
-        progress_percentage = completed / total_statements * 100
-        
-        st.progress(progress_percentage / 100, f"{progress_percentage:.0f}%")
-        
-        # Submit button
-        submitted = st.form_submit_button("Submit and Continue")
-        
-    if submitted:
-        # Process the responses
-        for key, response in responses.items():
-            # Map responses to the detailed quiz results structure
-            if response == "Completely Prefer A":
-                if first_is_original:
-                    st.session_state.detailed_quiz_results[key]["completely_prefer_original"] += 1
-                else:
-                    st.session_state.detailed_quiz_results[key]["completely_prefer_enriched"] += 1
-            elif response == "Somewhat Prefer A":
-                if first_is_original:
-                    st.session_state.detailed_quiz_results[key]["somewhat_prefer_original"] += 1
-                else:
-                    st.session_state.detailed_quiz_results[key]["somewhat_prefer_enriched"] += 1
-            elif response == "Neither":
-                st.session_state.detailed_quiz_results[key]["neither"] += 1
-            elif response == "Somewhat Prefer B":
-                if first_is_original:
-                    st.session_state.detailed_quiz_results[key]["somewhat_prefer_enriched"] += 1
-                else:
-                    st.session_state.detailed_quiz_results[key]["somewhat_prefer_original"] += 1
-            elif response == "Completely Prefer B":
-                if first_is_original:
-                    st.session_state.detailed_quiz_results[key]["completely_prefer_enriched"] += 1
-                else:
-                    st.session_state.detailed_quiz_results[key]["completely_prefer_original"] += 1
-        
-        # Calculate overall preference based on average of all criteria
-        preference_mapping = {
-            "Completely Prefer A": 2 if first_is_original else -2,
-            "Somewhat Prefer A": 1 if first_is_original else -1,
-            "Neither": 0,
-            "Somewhat Prefer B": -1 if first_is_original else 1,
-            "Completely Prefer B": -2 if first_is_original else 2
+        # Define the criteria
+        criteria = {
+            "understand": "Which statement is easier to understand?",
+            "read": "Which statement is easier to read?",
+            "detail": "Which statement offers greater detail?",
+            "profession": "Which statement fits your profession better?",
+            "assessment": "Which statement is more helpful for a self-assessment?"
         }
         
-        preference_scores = [preference_mapping[response] for response in responses.values()]
-        average_score = sum(preference_scores) / len(preference_scores)
+        # Create radio buttons for each criterion
+        for key, question in criteria.items():
+            responses[key] = st.radio(
+                question,
+                ["Completely Prefer A", "Somewhat Prefer A", "Neither", "Somewhat Prefer B", "Completely Prefer B"],
+                horizontal=True,
+                key=f"quiz_{key}_{statement_idx}",
+                index=None  # Set index to None to have no default selection
+            )
         
-        # Update overall quiz results based on the average score
-        if average_score > 0:
-            st.session_state.quiz_results["original"] += 1
-        elif average_score < 0:
-            st.session_state.quiz_results["enriched"] += 1
-        else:
-            # If exactly 0, randomly assign to break ties
-            if np.random.random() > 0.5:
+        # Submit button
+        submitted = st.form_submit_button("Submit Evaluation")
+        
+        if submitted:
+            # Process responses
+            for key, response in responses.items():
+                # Map responses to the detailed quiz results structure
+                if response == "Completely Prefer A":
+                    if first_is_original:
+                        st.session_state.detailed_quiz_results[key]["completely_prefer_original"] += 1
+                    else:
+                        st.session_state.detailed_quiz_results[key]["completely_prefer_enriched"] += 1
+                elif response == "Somewhat Prefer A":
+                    if first_is_original:
+                        st.session_state.detailed_quiz_results[key]["somewhat_prefer_original"] += 1
+                    else:
+                        st.session_state.detailed_quiz_results[key]["somewhat_prefer_enriched"] += 1
+                elif response == "Neither":
+                    st.session_state.detailed_quiz_results[key]["neither"] += 1
+                elif response == "Somewhat Prefer B":
+                    if first_is_original:
+                        st.session_state.detailed_quiz_results[key]["somewhat_prefer_enriched"] += 1
+                    else:
+                        st.session_state.detailed_quiz_results[key]["somewhat_prefer_original"] += 1
+                elif response == "Completely Prefer B":
+                    if first_is_original:
+                        st.session_state.detailed_quiz_results[key]["completely_prefer_enriched"] += 1
+                    else:
+                        st.session_state.detailed_quiz_results[key]["completely_prefer_original"] += 1
+            
+            # Calculate overall preference based on average of all criteria
+            preference_mapping = {
+                "Completely Prefer A": 2 if first_is_original else -2,
+                "Somewhat Prefer A": 1 if first_is_original else -1,
+                "Neither": 0,
+                "Somewhat Prefer B": -1 if first_is_original else 1,
+                "Completely Prefer B": -2 if first_is_original else 2
+            }
+            
+            preference_scores = [preference_mapping[response] for response in responses.values()]
+            average_score = sum(preference_scores) / len(preference_scores)
+            
+            # Update overall quiz results based on the average score
+            if average_score > 0:
                 st.session_state.quiz_results["original"] += 1
-            else:
+            elif average_score < 0:
                 st.session_state.quiz_results["enriched"] += 1
-        
-        # Add to shown indices
-        st.session_state.quiz_shown_indices.append(statement_idx)
-        
-        # Rerun to show the next question
-        st.rerun() 
+            else:
+                # If exactly 0, randomly assign to break ties
+                if np.random.random() > 0.5:
+                    st.session_state.quiz_results["original"] += 1
+                else:
+                    st.session_state.quiz_results["enriched"] += 1
+            
+            # Save quiz results to database after each submission
+            save_quiz_results(
+                st.session_state.user["id"],
+                st.session_state.quiz_results["original"],
+                st.session_state.quiz_results["enriched"],
+                st.session_state.detailed_quiz_results
+            )
+            
+            # Add to shown indices
+            st.session_state.quiz_shown_indices.append(statement_idx)
+            
+            # Rerun to show the next question
+            st.rerun() 

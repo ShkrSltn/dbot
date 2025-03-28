@@ -1,5 +1,5 @@
 import streamlit as st
-from service import generate_chat_response
+from services.chat_service import generate_chat_response
 
 def display_chatbot():
     st.title("💬 Digital Skills Chatbot")

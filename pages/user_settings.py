@@ -1,71 +1,78 @@
 import streamlit as st
 import pandas as pd
-from service import get_sample_statements, get_statement_categories
+from services.statement_service import get_all_statements
+from services.db.crud._settings import get_global_settings, save_global_settings
 
 def display_user_settings():
-    st.title("⚙️ User Settings")
+    st.title("⚙️ Global Settings")
     
     st.markdown("""
-    Customize your experience by selecting which statements you want to include in your assessment.
-    These settings will affect which statements are shown in the quiz and user journey.
+    Customize the global experience by selecting which statements you want to include in assessments.
+    These settings will affect which statements are shown in the quiz and user journey for all users.
     """)
     
-    # Initialize settings in session state if not exists
-    if 'user_settings' not in st.session_state:
-        st.session_state.user_settings = {
-            "selected_statements": [],
-            "custom_statements": [],
-            "max_statements_per_quiz": 5
-        }
+    # Get global settings
+    global_settings = get_global_settings("user_settings")
     
-    # Get statement categories from service
-    categories = get_statement_categories()
+    if not global_settings:
+        st.error("Failed to load global settings. Please try again later.")
+        return
+    
+    # Get all available statements
+    statements = get_all_statements()
     
     # Create tabs for different settings
     settings_tabs = st.tabs(["Select Statements", "Custom Statements", "Quiz Settings"])
     
     # Tab 1: Statement Selection
     with settings_tabs[0]:
-        st.subheader("Select Individual Statements")
+        st.subheader("Select Statements")
         st.markdown("""
-        Choose which statements you want to include in your assessment.
-        You can select statements from different categories.
+        Choose which statements you want to include in assessments.
         """)
         
-        # Create an expander for each category
-        selected_statements = st.session_state.user_settings.get("selected_statements", [])
+        # Get selected statements
+        selected_statements = global_settings.get("selected_statements", [])
         
-        for category, statements in categories.items():
-            with st.expander(f"{category} ({len(statements)} statements)"):
-                for statement in statements:
-                    is_selected = st.checkbox(
-                        statement,
-                        value=statement in selected_statements,
-                        key=f"statement_{statement}"
-                    )
-                    
-                    if is_selected and statement not in selected_statements:
-                        selected_statements.append(statement)
-                    elif not is_selected and statement in selected_statements:
-                        selected_statements.remove(statement)
+        # Create checkboxes for each statement
+        for i, statement in enumerate(statements):
+            is_selected = st.checkbox(
+                statement,
+                value=i in selected_statements,
+                key=f"statement_{i}"
+            )
+            
+            if is_selected and i not in selected_statements:
+                selected_statements.append(i)
+            elif not is_selected and i in selected_statements:
+                selected_statements.remove(i)
         
         # Save selected statements
-        st.session_state.user_settings["selected_statements"] = selected_statements
+        global_settings["selected_statements"] = selected_statements
         
         # Show selected statements
         if selected_statements:
-            st.subheader("Your Selected Statements")
+            st.subheader("Selected Statements")
             
             # Display as a dataframe
-            df = pd.DataFrame({"Statement": selected_statements})
+            selected_texts = [statements[i] for i in selected_statements]
+            df = pd.DataFrame({"Statement": selected_texts})
             st.dataframe(df, use_container_width=True)
             
             st.info(f"Total statements selected: {len(selected_statements)}")
             
+            # Функция для очистки всех выбранных утверждений
+            def clear_all_statements():
+                # Очищаем список выбранных утверждений
+                global_settings = get_global_settings("user_settings")
+                global_settings["selected_statements"] = []
+                save_global_settings("user_settings", global_settings)
+
             # Clear selection button
-            if st.button("Clear All Selections"):
-                st.session_state.user_settings["selected_statements"] = []
-                st.rerun()
+            if st.button("Clear All Statements", key="clear_all_btn", on_click=clear_all_statements):
+                # Кнопка автоматически вызовет функцию clear_all_statements при нажатии
+                # и затем выполнит перезагрузку страницы
+                pass
         else:
             st.warning("No statements selected. Please select at least one statement.")
     
@@ -73,12 +80,12 @@ def display_user_settings():
     with settings_tabs[1]:
         st.subheader("Add Custom Statements")
         st.markdown("""
-        Add your own custom statements that will be included in the assessment.
+        Add custom statements that will be included in assessments.
         These statements will be added to any selected from the categories.
         """)
         
         # Display existing custom statements
-        custom_statements = st.session_state.user_settings["custom_statements"]
+        custom_statements = global_settings.get("custom_statements", [])
         
         # Add new statement input
         new_statement = st.text_input("Add a new statement:", key="new_custom_statement")
@@ -86,14 +93,15 @@ def display_user_settings():
             if new_statement not in custom_statements:
                 custom_statements.append(new_statement)
                 st.success(f"Added: {new_statement}")
-                st.session_state.user_settings["custom_statements"] = custom_statements
+                global_settings["custom_statements"] = custom_statements
+                save_global_settings("user_settings", global_settings)
                 st.rerun()
             else:
                 st.error("This statement already exists in your custom list.")
         
         # Display and manage existing custom statements
         if custom_statements:
-            st.subheader("Your Custom Statements")
+            st.subheader("Custom Statements")
             
             for i, statement in enumerate(custom_statements):
                 col1, col2 = st.columns([4, 1])
@@ -102,15 +110,17 @@ def display_user_settings():
                 with col2:
                     if st.button("Remove", key=f"remove_custom_{i}"):
                         custom_statements.pop(i)
-                        st.session_state.user_settings["custom_statements"] = custom_statements
+                        global_settings["custom_statements"] = custom_statements
+                        save_global_settings("user_settings", global_settings)
                         st.rerun()
             
             # Clear all button
             if st.button("Clear All Custom Statements"):
-                st.session_state.user_settings["custom_statements"] = []
+                global_settings["custom_statements"] = []
+                save_global_settings("user_settings", global_settings)
                 st.rerun()
         else:
-            st.info("You haven't added any custom statements yet.")
+            st.info("No custom statements added yet.")
     
     # Tab 3: Quiz Settings
     with settings_tabs[2]:
@@ -121,16 +131,16 @@ def display_user_settings():
             "Maximum statements per quiz session:",
             min_value=1,
             max_value=10,
-            value=st.session_state.user_settings["max_statements_per_quiz"],
+            value=global_settings.get("max_statements_per_quiz", 5),
             step=1
         )
-        st.session_state.user_settings["max_statements_per_quiz"] = max_statements
+        global_settings["max_statements_per_quiz"] = max_statements
         
         # Display current settings summary
         st.subheader("Current Settings Summary")
         
         # Calculate total statements
-        total_statements = len(st.session_state.user_settings["selected_statements"]) + len(st.session_state.user_settings["custom_statements"])
+        total_statements = len(global_settings.get("selected_statements", [])) + len(global_settings.get("custom_statements", []))
         
         # Create summary dataframe
         summary_data = {
@@ -141,10 +151,10 @@ def display_user_settings():
                 "Max Statements Per Quiz"
             ],
             "Value": [
-                len(st.session_state.user_settings["selected_statements"]),
-                len(st.session_state.user_settings["custom_statements"]),
+                len(global_settings.get("selected_statements", [])),
+                len(global_settings.get("custom_statements", [])),
                 total_statements,
-                st.session_state.user_settings["max_statements_per_quiz"]
+                global_settings.get("max_statements_per_quiz", 5)
             ]
         }
         
@@ -153,4 +163,11 @@ def display_user_settings():
         
         # Warning if no statements selected
         if total_statements == 0:
-            st.warning("You haven't selected any statements. Please select statements or add custom statements.") 
+            st.warning("No statements available. Please select statements or add custom statements.")
+        
+        # Save button
+        if st.button("Save All Settings"):
+            if save_global_settings("user_settings", global_settings):
+                st.success("Settings saved successfully!")
+            else:
+                st.error("Failed to save settings. Please try again.") 

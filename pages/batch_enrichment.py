@@ -1,5 +1,8 @@
 import streamlit as st
-from service import enrich_statement_with_llm, calculate_quality_metrics, get_statements_from_settings
+from services.enrichment_service import enrich_statement_with_llm
+from services.metrics_service import calculate_quality_metrics
+from services.statement_service import get_statements_from_settings
+from services.db.crud._statements import save_statement
 
 def display_batch_enrichment(sample_statements):
     st.title("🔄 Batch Enrichment")
@@ -82,6 +85,19 @@ def display_batch_enrichment(sample_statements):
                         "metrics": metrics
                     })
                     
+                    # Save to database
+                    statement_id = save_statement(
+                        st.session_state.user["id"],
+                        statement,
+                        enriched_statement,
+                        metrics
+                    )
+                    
+                    if statement_id:
+                        print(f"Statement saved with ID: {statement_id}")
+                    else:
+                        print("Failed to save statement")
+                    
                 except Exception as e:
                     st.error(f"Error processing statement '{statement[:30]}...': {str(e)}")
             
@@ -89,6 +105,7 @@ def display_batch_enrichment(sample_statements):
             
         # Display summary
         st.subheader("Summary of Processed Statements")
+        
         for i, item in enumerate(st.session_state.enriched_statements[-len(all_statements):]):
             with st.expander(f"Statement {i+1}: {item['original'][:50]}..."):
                 col1, col2 = st.columns(2)
