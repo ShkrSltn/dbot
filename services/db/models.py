@@ -68,6 +68,7 @@ class QuizResult(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     original_preference = Column(Integer, default=0)
     enriched_preference = Column(Integer, default=0)
+    neither_preference = Column(Integer, default=0)
     detailed_results = Column(JSON, default={})
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow)

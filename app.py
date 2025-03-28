@@ -37,7 +37,7 @@ from pages.batch_enrichment import display_batch_enrichment
 from pages.quiz import display_quiz
 from pages.chatbot import display_chatbot
 from pages.analytics import display_analytics
-from pages.user_flow import display_user_flow
+from pages.user_page.user_flow import display_user_flow
 from pages.user_settings import display_user_settings
 from pages.prompt_engineer import display_prompt_engineer
 
@@ -195,15 +195,6 @@ def run_app():
             display_analytics()
         elif page == "Prompt Engineer":
             display_prompt_engineer(sample_statements)
-
-    # Save quiz results to database when session ends
-    if 'quiz_results' in st.session_state:
-        save_quiz_results(
-            st.session_state.user["id"],
-            st.session_state.quiz_results["original"],
-            st.session_state.quiz_results["enriched"],
-            st.session_state.detailed_quiz_results
-        )
 
     # Add footer
     st.markdown("---")
