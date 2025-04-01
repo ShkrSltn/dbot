@@ -5,6 +5,7 @@ import seaborn as sns
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import datetime
 
 # Import service functions
 from services.service import (
@@ -26,7 +27,8 @@ from services.service import (
     get_profile,
     get_global_settings,
     save_global_settings,
-    get_user_by_id
+    get_user_by_id,
+    verify_session_token
 )
 
 # Import page display functions
@@ -41,7 +43,52 @@ from pages.user_page.user_flow import display_user_flow
 from pages.user_settings import display_user_settings
 from pages.prompt_engineer import display_prompt_engineer
 
+# Import database connection and models
+from services.db.connection import get_database_connection
+from services.db.models import UserSession
+
+def verify_session_token(user_id, token):
+    """Verify that the session token is valid for the given user_id"""
+    # Здесь должна быть логика проверки токена в базе данных
+    # Например, проверка в таблице sessions, где хранятся активные сессии
+    db = get_database_connection()
+    if not db:
+        return False
+    
+    session = db["Session"]()
+    try:
+        # Проверяем токен в базе данных
+        session_record = session.query(UserSession).filter_by(
+            user_id=user_id, 
+            token=token,
+            expired=False
+        ).first()
+        
+        if session_record:
+            # Проверяем, не истек ли срок действия токена
+            if session_record.expires_at > datetime.datetime.utcnow():
+                return True
+            else:
+                # Помечаем токен как истекший
+                session_record.expired = True
+                session.commit()
+        return False
+    except Exception as e:
+        print(f"Error verifying session token: {e}")
+        return False
+    finally:
+        session.close()
+
 def run_app():
+    # Hide default sidebar navigation
+    st.markdown("""
+        <style>
+        [data-testid="stSidebarNav"] {
+            display: none;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # Get sample statements before page routing
     sample_statements = get_sample_statements()
 
@@ -54,18 +101,26 @@ def run_app():
     # Try to restore session from query params if not authenticated
     if not st.session_state.authenticated:
         try:
-            # Get user_id from query params
+            # Get user_id and session_token from query params
             user_id = st.query_params.get('user_id')
+            session_token = st.query_params.get('session_token')
             
-            if user_id:
-                # Try to get user from database
-                user = get_user_by_id(int(user_id))
-                if user:
-                    st.session_state.authenticated = True
-                    st.session_state.user = user
-                    st.session_state.current_role = user["role"]
+            if user_id and session_token:
+                # Verify session token is valid for this user
+                if verify_session_token(int(user_id), session_token):
+                    # Try to get user from database
+                    user = get_user_by_id(int(user_id))
+                    if user:
+                        st.session_state.authenticated = True
+                        st.session_state.user = user
+                        st.session_state.current_role = user["role"]
+                else:
+                    # Invalid session token, clear query params
+                    st.query_params.clear()
         except Exception as e:
             print(f"Error restoring session: {e}")
+            # Clear query params on error
+            st.query_params.clear()
 
     # Check authentication
     if not st.session_state.authenticated:

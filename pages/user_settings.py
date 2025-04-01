@@ -165,6 +165,19 @@ def display_user_settings():
         if total_statements == 0:
             st.warning("No statements available. Please select statements or add custom statements.")
         
+        # Display selected statements
+        if global_settings.get("selected_statements", []):
+            st.subheader("Selected Statements")
+            selected_texts = [statements[i] for i in global_settings.get("selected_statements", [])]
+            selected_df = pd.DataFrame({"Statement": selected_texts})
+            st.dataframe(selected_df, use_container_width=True, hide_index=True)
+        
+        # Display custom statements
+        if global_settings.get("custom_statements", []):
+            st.subheader("Custom Statements")
+            custom_df = pd.DataFrame({"Statement": global_settings.get("custom_statements", [])})
+            st.dataframe(custom_df, use_container_width=True, hide_index=True)
+        
         # Save button
         if st.button("Save All Settings"):
             if save_global_settings("user_settings", global_settings):

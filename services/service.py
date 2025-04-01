@@ -52,6 +52,12 @@ from services.db.crud._chat import (
     get_chat_history
 )
 
+# Import session management functions
+from services.db.connection import (
+    generate_session_token,
+    verify_session_token
+)
+
 # Re-export all imported functions for backward compatibility
 # This ensures that existing code that imports from service.py
 # will continue to work without changes

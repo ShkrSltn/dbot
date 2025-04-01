@@ -51,4 +51,30 @@ def get_profile(user_id):
         print(f"Error getting profile: {e}")
         return None
     finally:
-        session.close() 
+        session.close()
+
+def get_all_profiles():
+    db = get_database_connection()
+    if not db:
+        return None
+    
+    session = db["Session"]()
+    try:
+        profiles = session.query(Profile).all()
+        result = []
+        for profile in profiles:
+            result.append({
+                "user_id": profile.user_id,
+                "job_role": profile.job_role,
+                "job_domain": profile.job_domain,
+                "years_experience": profile.years_experience,
+                "digital_proficiency": profile.digital_proficiency,
+                "primary_tasks": profile.primary_tasks
+            })
+        return result
+    except Exception as e:
+        print(f"Error getting all profiles: {e}")
+        return None
+    finally:
+        session.close()
+    

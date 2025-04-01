@@ -124,51 +124,17 @@ def display_quiz_interface():
                 st.markdown("### B")
                 st.info(second_statement)
             
-            # Create radio buttons for each criterion for this statement pair
+            # Create sliders for each criterion for this statement pair
             st.markdown("#### Your Preference")
-            
-            # Add custom CSS to style radio buttons and add borders
-            st.markdown("""
-            <style>
-                div[data-testid="stRadio"] {
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    padding: 10px;
-                    margin-bottom: 15px;
-                    width: 100%;
-                }
-                div[data-testid="stRadio"] > div {
-                    display: flex;
-                    justify-content: space-between;
-                    width: 100%;
-                }
-                div[data-testid="stRadio"] > div > label {
-                    margin: 0 5px;
-                }
-                
-                /* Media query for mobile devices */
-                @media (max-width: 768px) {
-                    div[data-testid="stRadio"] > div {
-                        flex-direction: column;
-                    }
-                    div[data-testid="stRadio"] > div > label {
-                        margin: 5px 0;
-                    }
-                }
-            </style>
-            """, unsafe_allow_html=True)
-            
             for key, question in criteria.items():
-                # Use a unique key for each radio button that includes the statement index
-                radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
+                # Use a unique key for each slider that includes the statement index
+                slider_key = f"slider_{key}_{statement_idx}_{quiz_iteration_key}"
                 
-                # Determine horizontal or vertical layout based on screen width
-                st.radio(
+                st.select_slider(
                     question,
                     options=["Completely Prefer A", "Somewhat Prefer A", "Neither", "Somewhat Prefer B", "Completely Prefer B"],
-                    key=radio_key,
-                    horizontal=True,  # CSS медиа-запрос переопределит это для мобильных
-                    index=None  # This makes no option selected by default
+                    value=None,
+                    key=slider_key
                 )
             
             # Add a divider between statement pairs
@@ -185,30 +151,13 @@ def display_quiz_interface():
         submitted = st.form_submit_button("Submit All Responses")
         
     if submitted:
-        # Validate that all questions have been answered
-        all_answered = True
-        unanswered_questions = []
-        
-        for statement_idx in st.session_state.current_statements:
-            for key in criteria.keys():
-                radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
-                if radio_key not in st.session_state or st.session_state[radio_key] is None:
-                    all_answered = False
-                    unanswered_questions.append(f"Statement Pair {st.session_state.current_statements.index(statement_idx)+1}: {criteria[key]}")
-        
-        if not all_answered:
-            st.error("Please answer all questions before submitting:")
-            for question in unanswered_questions:
-                st.warning(question)
-            return
-            
         # Process all responses
         for statement_idx in st.session_state.current_statements:
             # Collect responses for this statement
             responses = {}
             for key in criteria.keys():
-                radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
-                responses[key] = st.session_state[radio_key]
+                slider_key = f"slider_{key}_{statement_idx}_{quiz_iteration_key}"
+                responses[key] = st.session_state[slider_key]
             
             # Handle the submission for this statement
             handle_quiz_submission(statement_idx, responses, first_is_original=True)
@@ -234,39 +183,8 @@ def handle_quiz_submission(statement_idx, responses, first_is_original):
             "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
         }
     
-    # Get current quiz iteration
-    current_quiz_iteration = st.session_state.current_quiz_iteration
-    quiz_iteration_key = f"quiz_iteration_{current_quiz_iteration}"
-    
-    # Validate responses for completeness and consistency
-    if None in responses.values() or "" in responses.values():
-        st.error(f"Please complete all questions for Statement Pair {statement_idx+1}")
-        return False
-    
-    # Check for inconsistent responses (optional validation)
-    preference_mapping = {
-        "Completely Prefer A": 2 if first_is_original else -2,
-        "Somewhat Prefer A": 1 if first_is_original else -1,
-        "Neither": 0,
-        "Somewhat Prefer B": -1 if first_is_original else 1,
-        "Completely Prefer B": -2 if first_is_original else 2
-    }
-    
-    preference_scores = [preference_mapping[response] for response in responses.values()]
-    
-    # Check if responses are highly inconsistent (e.g., some strongly prefer A while others strongly prefer B)
-    max_score = max(preference_scores)
-    min_score = min(preference_scores)
-    if max_score >= 2 and min_score <= -2:
-        # This is just a warning, not blocking submission
-        st.warning(f"Your responses for Statement Pair {statement_idx+1} seem inconsistent. Please review if needed.")
-    
     # Process the responses
     for key, response in responses.items():
-        # Update the key to match the new radio button keys
-        radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
-        response = st.session_state[radio_key]
-        
         # Map responses to the detailed quiz results structure
         if response == "Completely Prefer A":
             if first_is_original:

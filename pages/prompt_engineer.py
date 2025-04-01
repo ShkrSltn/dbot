@@ -1,15 +1,12 @@
 import streamlit as st
 from services.enrichment_service import enrich_statement_with_llm, DEFAULT_PROMPT
 from services.metrics_service import calculate_quality_metrics
+from services.db.crud._profiles import get_all_profiles, get_profile
 import json
 
 def display_prompt_engineer(sample_statements):
     st.title("🔧 Prompt Engineer")
     
-    if not st.session_state.profile["job_role"]:
-        st.warning("Please create your profile first in the Profile Builder section.")
-        st.stop()
-        
     # Initialize session state for prompts if not exists
     if 'prompts' not in st.session_state:
         st.session_state.prompts = {
@@ -18,6 +15,9 @@ def display_prompt_engineer(sample_statements):
     
     if 'current_prompt' not in st.session_state:
         st.session_state.current_prompt = 'default'
+    
+    if 'selected_profile' not in st.session_state:
+        st.session_state.selected_profile = 'current'
     
     st.markdown("""
     This page allows you to experiment with different prompts for statement enrichment.
@@ -39,6 +39,9 @@ def display_prompt_engineer(sample_statements):
                 options=list(st.session_state.prompts.keys())
             )
             current_prompt = st.session_state.prompts[selected_prompt]
+            
+            # Display the selected prompt text
+            st.text_area("Current prompt template:", value=current_prompt, height=200, disabled=True)
         else:
             new_prompt_name = st.text_input("New prompt name:")
             current_prompt = st.text_area(
@@ -61,9 +64,35 @@ def display_prompt_engineer(sample_statements):
         - `{length}`: Target character length
         """)
         
-        # Display current profile
-        st.subheader("Your Profile")
-        for key, value in st.session_state.profile.items():
+        # Profile selection
+        st.subheader("Profile Selection")
+        profile_option = st.radio("Select profile to use:", ["Current Profile", "Other Profile"])
+        
+        active_profile = {}
+        
+        if profile_option == "Current Profile":
+            if not st.session_state.profile["job_role"]:
+                st.warning("Your profile is incomplete. Please create your profile in the Profile Builder section.")
+            else:
+                active_profile = st.session_state.profile
+                st.session_state.selected_profile = 'current'
+        else:
+            # Get all available profiles
+            all_profiles = get_all_profiles()
+            if not all_profiles:
+                st.warning("No other profiles available.")
+            else:
+                profile_options = {f"{p['job_role']} ({p['user_id']})": p['user_id'] for p in all_profiles}
+                selected_profile_name = st.selectbox("Select a profile:", options=list(profile_options.keys()))
+                
+                if selected_profile_name:
+                    user_id = profile_options[selected_profile_name]
+                    active_profile = get_profile(user_id)
+                    st.session_state.selected_profile = user_id
+        
+        # Display active profile
+        st.subheader("Active Profile")
+        for key, value in active_profile.items():
             st.write(f"**{key.replace('_', ' ').title()}:** {value}")
     
     # Testing section
@@ -83,51 +112,54 @@ def display_prompt_engineer(sample_statements):
     statement_length = st.slider("Statement Length (characters)", 100, 300, 150)
     
     if st.button("Test Enrichment") and original_statement:
-        try:
-            with st.spinner("Processing..."):
-                # Create context from profile
-                context = ", ".join(
-                    [f"{k.replace('_', ' ').title()}: {v}" for k, v in st.session_state.profile.items() if v])
-                
-                # Enrich statement
-                enriched_statement = enrich_statement_with_llm(
-                    context, 
-                    original_statement, 
-                    statement_length,
-                    current_prompt
-                )
-                
-                # Calculate metrics
-                metrics = calculate_quality_metrics(original_statement, enriched_statement)
-                
-                # Display results
-                st.subheader("Results")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("### Original Statement")
-                    st.info(original_statement)
-                
-                with col2:
-                    st.markdown("### Enriched Statement")
-                    st.success(enriched_statement)
-                
-                # Display metrics
-                st.subheader("Quality Metrics")
-                metrics_cols = st.columns(3)
-                
-                with metrics_cols[0]:
-                    st.metric("TF-IDF Similarity", f"{metrics['cosine_tfidf']:.2f}")
-                
-                with metrics_cols[1]:
-                    st.metric("Embedding Similarity", f"{metrics['cosine_embedding']:.2f}")
-                
-                with metrics_cols[2]:
-                    st.metric("Reading Ease", f"{metrics['readability']['estimated_reading_ease']:.1f}")
-                
-                # Show detailed metrics
-                with st.expander("Detailed Metrics"):
-                    st.json(metrics)
-                
-        except Exception as e:
-            st.error(f"Error during enrichment: {str(e)}") 
+        if not active_profile:
+            st.error("Please select a valid profile before testing.")
+        else:
+            try:
+                with st.spinner("Processing..."):
+                    # Create context from profile
+                    context = ", ".join(
+                        [f"{k.replace('_', ' ').title()}: {v}" for k, v in active_profile.items() if v])
+                    
+                    # Enrich statement
+                    enriched_statement = enrich_statement_with_llm(
+                        context, 
+                        original_statement, 
+                        statement_length,
+                        current_prompt
+                    )
+                    
+                    # Calculate metrics
+                    metrics = calculate_quality_metrics(original_statement, enriched_statement)
+                    
+                    # Display results
+                    st.subheader("Results")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("### Original Statement")
+                        st.info(original_statement)
+                    
+                    with col2:
+                        st.markdown("### Enriched Statement")
+                        st.success(enriched_statement)
+                    
+                    # Display metrics
+                    st.subheader("Quality Metrics")
+                    metrics_cols = st.columns(3)
+                    
+                    with metrics_cols[0]:
+                        st.metric("TF-IDF Similarity", f"{metrics['cosine_tfidf']:.2f}")
+                    
+                    with metrics_cols[1]:
+                        st.metric("Embedding Similarity", f"{metrics['cosine_embedding']:.2f}")
+                    
+                    with metrics_cols[2]:
+                        st.metric("Reading Ease", f"{metrics['readability']['estimated_reading_ease']:.1f}")
+                    
+                    # Show detailed metrics
+                    with st.expander("Detailed Metrics"):
+                        st.json(metrics)
+                    
+            except Exception as e:
+                st.error(f"Error during enrichment: {str(e)}") 

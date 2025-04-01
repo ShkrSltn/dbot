@@ -26,6 +26,16 @@ def initialize_app():
             layout="wide",
             initial_sidebar_state="expanded"
         )
+        
+        # Hide default sidebar navigation
+        st.markdown("""
+            <style>
+            [data-testid="stSidebarNav"] {
+                display: none;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
         print("DEBUG: set_page_config called successfully")
         
         # Check database connection

@@ -94,4 +94,18 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     # Relationship
+    user = relationship("User")
+
+# Добавляем новую модель для сессий пользователей
+class UserSession(Base):
+    __tablename__ = 'user_sessions'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    token = Column(String(128), nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    expired = Column(Boolean, default=False)
+    
+    # Relationship
     user = relationship("User") 

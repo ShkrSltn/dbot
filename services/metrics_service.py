@@ -1,8 +1,23 @@
 import numpy as np
 from services.embedding_service import load_embedding_model
+from typing import Dict, Any, Optional
+import re
+from collections import Counter
 
-def calculate_quality_metrics(original, enriched):
-    """Calculates quality metrics between original and enriched statements"""
+def calculate_quality_metrics(original: str, enriched: str) -> Dict[str, Any]:
+    """
+    Calculates quality metrics between original and enriched statements.
+    
+    Args:
+        original: The original text content
+        enriched: The enriched/enhanced text content
+        
+    Returns:
+        Dictionary containing similarity and readability metrics
+        
+    Raises:
+        ValueError: If empty strings are provided
+    """
     try:
         print("DEBUG: Starting calculate_quality_metrics")
         # Check for empty strings
@@ -21,26 +36,15 @@ def calculate_quality_metrics(original, enriched):
         
         # Calculate cosine similarity
         print("DEBUG: Calculating cosine similarity")
-        embedding_sim = np.dot(original_embedding, enriched_embedding) / (
-                np.linalg.norm(original_embedding) * np.linalg.norm(enriched_embedding))
+        embedding_sim = calculate_cosine_similarity(original_embedding, enriched_embedding)
         
-        # TF-IDF similarity (simplified calculation for demo)
+        # TF-IDF similarity (improved calculation)
         print("DEBUG: Calculating TF-IDF similarity")
-        tfidf_sim = 0.5 + (embedding_sim * 0.5)  # Use embedding_sim as a base
+        tfidf_sim = calculate_tfidf_similarity(original, enriched)
         
-        # Simplified readability metrics
+        # Enhanced readability metrics
         print("DEBUG: Calculating readability metrics")
-        word_count = len(enriched.split())
-        char_count = len(enriched)
-        avg_word_length = char_count / max(1, word_count)
-        
-        # Readability scores
-        readability = {
-            "word_count": word_count,
-            "character_count": char_count,
-            "avg_word_length": avg_word_length,
-            "estimated_reading_ease": max(0, min(100, 100 - (avg_word_length * 10)))
-        }
+        readability = calculate_readability_metrics(enriched)
         
         print("DEBUG: Metrics calculation completed successfully")
         return {
@@ -51,3 +55,54 @@ def calculate_quality_metrics(original, enriched):
     except Exception as e:
         print(f"DEBUG: Error calculating metrics: {e}")
         raise 
+
+def calculate_cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Calculate cosine similarity between two vectors."""
+    return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+
+def calculate_tfidf_similarity(text1: str, text2: str) -> float:
+    """Calculate a more accurate TF-IDF based similarity."""
+    # Tokenize texts
+    tokens1 = re.findall(r'\b\w+\b', text1.lower())
+    tokens2 = re.findall(r'\b\w+\b', text2.lower())
+    
+    # Calculate term frequencies
+    tf1 = Counter(tokens1)
+    tf2 = Counter(tokens2)
+    
+    # Get all unique terms
+    all_terms = set(tokens1) | set(tokens2)
+    
+    # Calculate dot product and magnitudes
+    dot_product = sum(tf1.get(term, 0) * tf2.get(term, 0) for term in all_terms)
+    magnitude1 = np.sqrt(sum(tf1.get(term, 0) ** 2 for term in all_terms))
+    magnitude2 = np.sqrt(sum(tf2.get(term, 0) ** 2 for term in all_terms))
+    
+    # Calculate cosine similarity
+    if magnitude1 * magnitude2 == 0:
+        return 0.0
+    
+    return dot_product / (magnitude1 * magnitude2)
+
+def calculate_readability_metrics(text: str) -> Dict[str, Any]:
+    """Calculate comprehensive readability metrics."""
+    # Basic counts
+    word_count = len(re.findall(r'\b\w+\b', text))
+    char_count = len(text)
+    sentence_count = max(1, len(re.split(r'[.!?]+', text)) - 1)
+    
+    # Average calculations
+    avg_word_length = char_count / max(1, word_count)
+    avg_sentence_length = word_count / max(1, sentence_count)
+    
+    # Flesch Reading Ease score (simplified)
+    reading_ease = 206.835 - (1.015 * avg_sentence_length) - (84.6 * (char_count / max(1, word_count) / 5))
+    reading_ease = max(0, min(100, reading_ease))
+    
+    return {
+        "word_count": word_count,
+        "character_count": char_count,
+        "avg_word_length": avg_word_length,
+        "avg_sentence_length": avg_sentence_length,
+        "estimated_reading_ease": float(reading_ease)
+    } 

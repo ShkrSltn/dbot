@@ -1,5 +1,6 @@
 import streamlit as st
 from services.db.crud._users import authenticate_user, create_anonymous_user
+from services.db.connection import generate_session_token
 import uuid
 
 def display_auth():
@@ -35,13 +36,17 @@ def display_auth():
                     else:
                         auth_result = authenticate_user(username, password)
                         if auth_result["success"]:
+                            # Generate session token
+                            session_token = generate_session_token(auth_result["user"]["id"])
+                            
                             # Set session state first
                             st.session_state.authenticated = True
                             st.session_state.user = auth_result["user"]
                             st.session_state.current_role = auth_result["user"]["role"]
                             
-                            # Then set query params
+                            # Then set query params with both user_id and session_token
                             st.query_params['user_id'] = str(auth_result["user"]["id"])
+                            st.query_params['session_token'] = session_token
                             
                             st.rerun()
                         else:

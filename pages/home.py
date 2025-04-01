@@ -28,9 +28,6 @@ def display_home_page():
     Use the navigation menu on the left to explore the different features.
     """)
     
-    # Add a sample image or visualization
-    st.image("https://via.placeholder.com/800x400?text=DigiBot+Demo+Visualization", 
-             caption="DigiBot personalization visualization")
 
     # Display current profile if available
     if st.session_state.profile["job_role"]:

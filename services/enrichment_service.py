@@ -3,9 +3,16 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+import logging
+from typing import Optional, Dict, Any
+from functools import lru_cache
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 DEFAULT_PROMPT = """Context: {context}
 Original Statement: {original_statement}
@@ -16,39 +23,82 @@ and appropriate difficulty based on the context. Limit the response to a maximum
 Don't make phrases which include the job profile ex. 'As a ...' and don't include 
 the digital proficiency level."""
 
-def load_llm():
-    """Loads and returns the LLM model for enrichment"""
+@lru_cache(maxsize=1)
+def load_llm(model_name: str = "gpt-4o", temperature: float = 0.7) -> ChatOpenAI:
+    """Loads and returns the LLM model for enrichment with caching for efficiency"""
     # Use API key from environment variables
     api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        logger.error("OPENAI_API_KEY not found in environment variables")
+        raise ValueError("OpenAI API key is missing")
+        
+    logger.info(f"Loading LLM model: {model_name}")
     return ChatOpenAI(
-        model="gpt-4o",
-        temperature=0.7,
+        model=model_name,
+        temperature=temperature,
         api_key=api_key
     )
 
-def enrich_statement_with_llm(context, original_statement, statement_length=150, prompt_template=None):
-    """Enriches a statement using LangChain"""
+def calculate_length(original_statement: str, statement_length: int) -> int:
+    """Calculate the appropriate length for the enriched statement"""
+    # If statement_length is a percentage
+    if statement_length <= 100:
+        return max(150, round(len(original_statement) * (1 + statement_length / 100)))
+    # If statement_length is an absolute character count
+    return statement_length
+
+def enrich_statement_with_llm(
+    context: str, 
+    original_statement: str, 
+    statement_length: int = 150, 
+    prompt_template: Optional[str] = None,
+    model_name: str = "gpt-4o",
+    temperature: float = 0.7,
+    additional_params: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Enriches a statement using LangChain
+    
+    Args:
+        context: The context for enrichment
+        original_statement: The original statement to enrich
+        statement_length: Target length (can be percentage or absolute character count)
+        prompt_template: Custom prompt template (uses DEFAULT_PROMPT if None)
+        model_name: Name of the LLM model to use
+        temperature: Temperature setting for the LLM
+        additional_params: Additional parameters to pass to the prompt
+        
+    Returns:
+        Enriched statement
+    """
     try:
         # Calculate the character limit
-        statement_length_percent = len(original_statement) / 100 * statement_length
-        rounded_length = round(statement_length_percent)
-
+        rounded_length = calculate_length(original_statement, statement_length)
+        
         # Use custom prompt template if provided, otherwise use default
         if prompt_template is None:
             prompt_template = DEFAULT_PROMPT
 
         prompt = ChatPromptTemplate.from_template(prompt_template)
 
-        # Create and run the chain
-        chain = prompt | load_llm() | StrOutputParser()
-        
-        enriched = chain.invoke({
+        # Prepare parameters for the prompt
+        params = {
             "context": context,
             "original_statement": original_statement,
             "length": rounded_length
-        })
+        }
+        
+        # Add any additional parameters
+        if additional_params:
+            params.update(additional_params)
+
+        # Create and run the chain
+        chain = prompt | load_llm(model_name, temperature) | StrOutputParser()
+        
+        logger.info(f"Enriching statement of length {len(original_statement)} to target length {rounded_length}")
+        enriched = chain.invoke(params)
 
         return enriched.strip()
     except Exception as e:
-        print(f"Error enriching statement: {e}")
+        logger.error(f"Error enriching statement: {str(e)}", exc_info=True)
         raise 
