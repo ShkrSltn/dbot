@@ -1,22 +1,17 @@
-import os
-from dotenv import load_dotenv
-from langchain_openai import OpenAIEmbeddings
+import logging
+from services.ai_service import get_embedding_model
 
-# Load environment variables
-load_dotenv()
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def load_embedding_model():
     """Loads and returns the embedding model"""
-    print("DEBUG: Inside load_embedding_model function")
+    logger.info("Loading embedding model")
     try:
-        # Use API key from environment variables
-        api_key = os.getenv("OPENAI_API_KEY")
-        model = OpenAIEmbeddings(
-            model="text-embedding-3-small",
-            api_key=api_key
-        )
-        print("DEBUG: OpenAIEmbeddings model loaded successfully")
+        model = get_embedding_model()
+        logger.info("Embedding model loaded successfully")
         return model
     except Exception as e:
-        print(f"DEBUG: Error loading embedding model: {e}")
+        logger.error(f"Error loading embedding model: {e}", exc_info=True)
         raise

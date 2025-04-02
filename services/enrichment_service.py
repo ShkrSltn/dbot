@@ -1,14 +1,10 @@
-import os
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 import logging
 from typing import Optional, Dict, Any
-from functools import lru_cache
 
-# Load environment variables
-load_dotenv()
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+from services.ai_service import get_chat_model
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -22,22 +18,6 @@ and appropriate difficulty based on the context. Limit the response to a maximum
 {length} characters without cutting off mid-sentence. 
 Don't make phrases which include the job profile ex. 'As a ...' and don't include 
 the digital proficiency level."""
-
-@lru_cache(maxsize=1)
-def load_llm(model_name: str = "gpt-4o", temperature: float = 0.7) -> ChatOpenAI:
-    """Loads and returns the LLM model for enrichment with caching for efficiency"""
-    # Use API key from environment variables
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logger.error("OPENAI_API_KEY not found in environment variables")
-        raise ValueError("OpenAI API key is missing")
-        
-    logger.info(f"Loading LLM model: {model_name}")
-    return ChatOpenAI(
-        model=model_name,
-        temperature=temperature,
-        api_key=api_key
-    )
 
 def calculate_length(original_statement: str, statement_length: int) -> int:
     """Calculate the appropriate length for the enriched statement"""
@@ -93,7 +73,7 @@ def enrich_statement_with_llm(
             params.update(additional_params)
 
         # Create and run the chain
-        chain = prompt | load_llm(model_name, temperature) | StrOutputParser()
+        chain = prompt | get_chat_model(model_name, temperature) | StrOutputParser()
         
         logger.info(f"Enriching statement of length {len(original_statement)} to target length {rounded_length}")
         enriched = chain.invoke(params)

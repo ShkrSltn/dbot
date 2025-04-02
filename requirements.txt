@@ -18,9 +18,14 @@ langchain-core>=0.1.0
 sentence-transformers>=2.2.0
 scikit-learn>=1.3.0
 textstat>=0.7.0
+bcrypt>=4.0.0
 
 # HTTP requests
 requests>=2.31.0
 
 # Database
 psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+
+# Security
+uuid>=0.1.0

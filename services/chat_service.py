@@ -1,24 +1,36 @@
-import os
-from dotenv import load_dotenv
-import streamlit as st
+import logging
+from typing import Dict, Optional, Any
 
 # LangChain imports
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-# Load environment variables
-load_dotenv()
+from services.ai_service import get_chat_model
 
-def load_llm():
-    """Loads and returns the LLM model for chat"""
-    return ChatOpenAI(
-        model="gpt-4o",
-        temperature=0.7,
-        api_key="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"
-    )
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def generate_chat_response(query, persona_context, max_tokens=None):
+def load_llm(max_tokens: Optional[int] = None):
+    """
+    Loads and returns the LLM model
+    
+    Args:
+        max_tokens: Maximum number of tokens for the response
+        
+    Returns:
+        Configured LLM model
+    """
+    logger.info("Loading LLM model")
+    try:
+        model = get_chat_model(max_tokens=max_tokens)
+        logger.info("LLM model loaded successfully")
+        return model
+    except Exception as e:
+        logger.error(f"Error loading LLM model: {e}", exc_info=True)
+        raise
+
+def generate_chat_response(query: str, persona_context: Dict[str, Any], max_tokens: Optional[int] = None) -> str:
     """Generates a chat response using LangChain"""
     try:
         # Create system message with user context
@@ -37,24 +49,14 @@ def generate_chat_response(query, persona_context, max_tokens=None):
             HumanMessagePromptTemplate.from_template("{query}")
         ])
 
-        # Create chain
-        llm = load_llm()
-        
-        # Apply max_tokens parameter if provided
-        if max_tokens is not None:
-            llm = ChatOpenAI(
-                model="gpt-4o",
-                temperature=0.7,
-                max_tokens=max_tokens,
-                api_key=os.getenv("OPENAI_API_KEY")
-            )
+        # Get chat model with appropriate settings
+        llm = get_chat_model(max_tokens=max_tokens)
             
+        # Create and run chain
         chain = prompt | llm | StrOutputParser()
-
-        # Run chain
         response = chain.invoke({"query": query})
 
         return response.strip()
     except Exception as e:
-        print(f"Error generating chat response: {e}")
+        logger.error(f"Error generating chat response: {e}", exc_info=True)
         return "Sorry, I couldn't process your request at the moment."
