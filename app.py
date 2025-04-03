@@ -47,6 +47,9 @@ from pages.prompt_engineer import display_prompt_engineer
 from services.db.connection import get_database_connection
 from services.db.models import UserSession
 
+# Import new service
+from services.profile_evaluation_service import evaluate_profile_with_ai
+
 def verify_session_token(user_id, token):
     """Verify that the session token is valid for the given user_id"""
     # Здесь должна быть логика проверки токена в базе данных

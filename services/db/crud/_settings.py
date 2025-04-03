@@ -117,3 +117,4 @@ def save_global_settings(key="user_settings", value=None):
         return False
     finally:
         session.close() 
+        

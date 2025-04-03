@@ -29,12 +29,19 @@ def get_openai_api_key() -> str:
 
 @lru_cache(maxsize=10)
 def get_chat_model(
-    model_name: str = DEFAULT_CHAT_MODEL, 
-    temperature: float = DEFAULT_CHAT_TEMPERATURE,
+    model_name: str = None, 
+    temperature: float = None,
     max_tokens: Optional[int] = None,
     **kwargs
 ) -> ChatOpenAI:
     """Get a configured ChatOpenAI model instance with caching for efficiency"""
+    # Use environment variables or defaults
+    if model_name is None:
+        model_name = str(DEFAULT_CHAT_MODEL)
+    
+    if temperature is None:
+        temperature = float(DEFAULT_CHAT_TEMPERATURE)
+    
     logger.info(f"Loading chat model: {model_name} (temp: {temperature})")
     
     model_params = {
@@ -64,3 +71,17 @@ def get_embedding_model(
     }
     
     return OpenAIEmbeddings(**model_params) 
+
+def get_llm_model(model_name: str = DEFAULT_CHAT_MODEL, temperature: float = DEFAULT_CHAT_TEMPERATURE, **kwargs) -> ChatOpenAI:
+    """Get a configured ChatOpenAI model instance with caching for efficiency"""
+    logger.info(f"Loading LLM model: {model_name} (temp: {temperature})")
+    
+    model_params = {
+        "model": model_name,
+        "temperature": temperature,
+        "api_key": get_openai_api_key(),
+        **kwargs
+    }
+    
+    return ChatOpenAI(**model_params)
+    

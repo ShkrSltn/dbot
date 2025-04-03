@@ -52,6 +52,12 @@ from services.db.crud._chat import (
     get_chat_history
 )
 
+from services.db.crud._prompts import (
+    save_prompt,
+    get_user_prompts,
+    delete_prompt
+)
+
 # Import session management functions
 from services.db.connection import (
     generate_session_token,

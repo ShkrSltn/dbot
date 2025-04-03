@@ -5,4 +5,5 @@ from ._statements import *
 from ._quiz import *
 from ._settings import *
 from ._analytics import *
-from ._chat import * 
+from ._chat import *
+from ._prompts import * 

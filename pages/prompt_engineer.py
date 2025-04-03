@@ -2,6 +2,7 @@ import streamlit as st
 from services.enrichment_service import enrich_statement_with_llm, DEFAULT_PROMPT
 from services.metrics_service import calculate_quality_metrics
 from services.db.crud._profiles import get_all_profiles, get_profile
+from services.db.crud._prompts import save_prompt, get_user_prompts, delete_prompt
 import json
 
 def display_prompt_engineer(sample_statements):
@@ -9,9 +10,23 @@ def display_prompt_engineer(sample_statements):
     
     # Initialize session state for prompts if not exists
     if 'prompts' not in st.session_state:
-        st.session_state.prompts = {
-            'default': DEFAULT_PROMPT
-        }
+        # Load prompts from database
+        user_prompts = get_user_prompts(st.session_state.user["id"])
+        
+        # If no prompts in database, initialize with default
+        if not user_prompts:
+            st.session_state.prompts = {
+                'default': DEFAULT_PROMPT
+            }
+        else:
+            # Make sure we always have a default prompt
+            if 'default' not in user_prompts:
+                user_prompts['default'] = DEFAULT_PROMPT
+            st.session_state.prompts = user_prompts
+    
+    # Make sure 'default' key exists in prompts
+    if 'default' not in st.session_state.prompts:
+        st.session_state.prompts['default'] = DEFAULT_PROMPT
     
     if 'current_prompt' not in st.session_state:
         st.session_state.current_prompt = 'default'
@@ -24,24 +39,35 @@ def display_prompt_engineer(sample_statements):
     You can create, test, and compare different prompt variations to find the most effective one.
     """)
     
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 2])
     
     with col1:
-        # Prompt management
         st.subheader("Prompt Management")
         
         # Prompt selection or creation
-        prompt_action = st.radio("Select action:", ["Use existing prompt", "Create new prompt"])
+        prompt_option = st.radio("Select an option:", ["Use Existing Prompt", "Create New Prompt"])
         
-        if prompt_action == "Use existing prompt":
+        if prompt_option == "Use Existing Prompt":
             selected_prompt = st.selectbox(
-                "Select a prompt template:",
-                options=list(st.session_state.prompts.keys())
+                "Select a prompt:",
+                list(st.session_state.prompts.keys()),
+                index=list(st.session_state.prompts.keys()).index(st.session_state.current_prompt)
             )
             current_prompt = st.session_state.prompts[selected_prompt]
             
             # Display the selected prompt text
             st.text_area("Current prompt template:", value=current_prompt, height=200, disabled=True)
+            
+            # Add delete button for non-default prompts
+            if selected_prompt != 'default':
+                if st.button("Delete Selected Prompt"):
+                    if delete_prompt(st.session_state.user["id"], selected_prompt):
+                        del st.session_state.prompts[selected_prompt]
+                        st.session_state.current_prompt = 'default'
+                        st.success(f"Prompt '{selected_prompt}' deleted successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to delete prompt.")
         else:
             new_prompt_name = st.text_input("New prompt name:")
             current_prompt = st.text_area(
@@ -51,9 +77,12 @@ def display_prompt_engineer(sample_statements):
             )
             
             if st.button("Save New Prompt") and new_prompt_name:
-                st.session_state.prompts[new_prompt_name] = current_prompt
-                st.success(f"Prompt '{new_prompt_name}' saved successfully!")
-                st.session_state.current_prompt = new_prompt_name
+                if save_prompt(st.session_state.user["id"], new_prompt_name, current_prompt):
+                    st.session_state.prompts[new_prompt_name] = current_prompt
+                    st.session_state.current_prompt = new_prompt_name
+                    st.success(f"Prompt '{new_prompt_name}' saved successfully!")
+                else:
+                    st.error("Failed to save prompt to database.")
     
     with col2:
         st.subheader("Available Variables")

@@ -108,4 +108,17 @@ class UserSession(Base):
     expired = Column(Boolean, default=False)
     
     # Relationship
+    user = relationship("User")
+
+class Prompt(Base):
+    __tablename__ = 'prompts'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    name = Column(String(100), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationship
     user = relationship("User") 

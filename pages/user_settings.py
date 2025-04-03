@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from services.statement_service import get_all_statements
 from services.db.crud._settings import get_global_settings, save_global_settings
+from services.db.crud._prompts import get_user_prompts, get_all_prompts
+from services.enrichment_service import DEFAULT_PROMPT
 
 def display_user_settings():
     st.title("⚙️ Global Settings")
@@ -22,7 +24,7 @@ def display_user_settings():
     statements = get_all_statements()
     
     # Create tabs for different settings
-    settings_tabs = st.tabs(["Select Statements", "Custom Statements", "Quiz Settings"])
+    settings_tabs = st.tabs(["Select Statements", "Custom Statements", "Quiz Settings", "AI Features", "Prompt Settings"])
     
     # Tab 1: Statement Selection
     with settings_tabs[0]:
@@ -69,7 +71,7 @@ def display_user_settings():
                 save_global_settings("user_settings", global_settings)
 
             # Clear selection button
-            if st.button("Clear All Statements", key="clear_all_btn", on_click=clear_all_statements):
+            if st.button("Clear All Statements", key="clear_all_statements_btn", on_click=clear_all_statements):
                 # Кнопка автоматически вызовет функцию clear_all_statements при нажатии
                 # и затем выполнит перезагрузку страницы
                 pass
@@ -89,7 +91,7 @@ def display_user_settings():
         
         # Add new statement input
         new_statement = st.text_input("Add a new statement:", key="new_custom_statement")
-        if st.button("Add Statement") and new_statement:
+        if st.button("Add Statement", key="add_custom_statement_btn") and new_statement:
             if new_statement not in custom_statements:
                 custom_statements.append(new_statement)
                 st.success(f"Added: {new_statement}")
@@ -115,7 +117,7 @@ def display_user_settings():
                         st.rerun()
             
             # Clear all button
-            if st.button("Clear All Custom Statements"):
+            if st.button("Clear All Custom Statements", key="clear_all_custom_statements_btn"):
                 global_settings["custom_statements"] = []
                 save_global_settings("user_settings", global_settings)
                 st.rerun()
@@ -177,10 +179,148 @@ def display_user_settings():
             st.subheader("Custom Statements")
             custom_df = pd.DataFrame({"Statement": global_settings.get("custom_statements", [])})
             st.dataframe(custom_df, use_container_width=True, hide_index=True)
+    
+    # Tab 4: AI Features Settings
+    with settings_tabs[3]:
+        st.subheader("AI Features")
+        st.markdown("""
+        Enable or disable AI-powered features in the application.
+        """)
         
-        # Save button
-        if st.button("Save All Settings"):
-            if save_global_settings("user_settings", global_settings):
-                st.success("Settings saved successfully!")
-            else:
-                st.error("Failed to save settings. Please try again.") 
+        # Initialize profile_evaluation_enabled if it doesn't exist
+        if "profile_evaluation_enabled" not in global_settings:
+            global_settings["profile_evaluation_enabled"] = True
+        
+        # Toggle for profile evaluation
+        profile_evaluation_enabled = st.toggle(
+            "Enable Profile Evaluation with AI",
+            value=global_settings.get("profile_evaluation_enabled", True),
+            help="When enabled, AI will evaluate user profiles and provide suggestions for improvement."
+        )
+        
+        # Update settings
+        global_settings["profile_evaluation_enabled"] = profile_evaluation_enabled
+        
+        # Explanation of the feature
+        if profile_evaluation_enabled:
+            st.success("Profile evaluation with AI is enabled. Users will receive AI-powered suggestions to improve their profiles.")
+        else:
+            st.info("Profile evaluation with AI is disabled. Users will not receive AI-powered suggestions for their profiles.")
+    
+    # Tab 5: Prompt Settings
+    with settings_tabs[4]:
+        st.subheader("Prompt Settings")
+        st.markdown("""
+        Select which prompt template to use for statement enrichment.
+        The selected prompt will be used for all statement enrichments.
+        """)
+        
+        # Get all prompts
+        all_prompts = get_all_prompts()
+        
+        if not all_prompts:
+            st.warning("No custom prompts found. Using default prompt.")
+            # Add default prompt to the list
+            all_prompts = [{
+                "id": 0,
+                "user_id": None,
+                "name": "Default",
+                "content": DEFAULT_PROMPT,
+                "created_at": None
+            }]
+        else:
+            # Add default prompt to the beginning of the list
+            all_prompts.insert(0, {
+                "id": 0,
+                "user_id": None,
+                "name": "Default",
+                "content": DEFAULT_PROMPT,
+                "created_at": None
+            })
+        
+        # Create a dictionary of prompt names to IDs for the selectbox
+        prompt_options = {p["name"]: p["id"] for p in all_prompts}
+        
+        # Get currently selected prompt ID from settings
+        current_prompt_id = global_settings.get("selected_prompt_id", 0)
+        
+        # Find the name of the current prompt
+        current_prompt_name = "Default"
+        for p in all_prompts:
+            if p["id"] == current_prompt_id:
+                current_prompt_name = p["name"]
+                break
+        
+        # Create selectbox for prompt selection
+        selected_prompt_name = st.selectbox(
+            "Select Prompt Template:",
+            options=list(prompt_options.keys()),
+            index=list(prompt_options.keys()).index(current_prompt_name) if current_prompt_name in prompt_options else 0
+        )
+        
+        # Get the ID of the selected prompt
+        selected_prompt_id = prompt_options[selected_prompt_name]
+        
+        # Display the content of the selected prompt
+        selected_prompt_content = ""
+        for p in all_prompts:
+            if p["id"] == selected_prompt_id:
+                selected_prompt_content = p["content"]
+                break
+        
+        st.text_area("Prompt Content:", value=selected_prompt_content, height=300, disabled=True)
+        
+        # Update the global settings with the selected prompt ID
+        if selected_prompt_id != current_prompt_id:
+            global_settings["selected_prompt_id"] = selected_prompt_id
+            st.info(f"Prompt '{selected_prompt_name}' selected. Click 'Save All Settings' to apply changes.")
+    
+    # Summary section
+    with st.expander("Settings Summary", expanded=False):
+        # Add profile evaluation to summary
+        summary_data = {
+            "Setting": [
+                "Selected Statements",
+                "Custom Statements",
+                "Total Statements",
+                "Statements Per Quiz",
+                "Profile Evaluation"
+            ],
+            "Value": [
+                str(len(global_settings.get("selected_statements", []))),
+                str(len(global_settings.get("custom_statements", []))),
+                str(len(global_settings.get("selected_statements", [])) + 
+                len(global_settings.get("custom_statements", []))),
+                str(global_settings.get("max_statements_per_quiz", 5)),
+                "Enabled" if global_settings.get("profile_evaluation_enabled", True) else "Disabled"
+            ]
+        }
+        
+        # Явно преобразуем все значения в строки
+        summary_df = pd.DataFrame(summary_data)
+        
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        
+        # Warning if no statements selected
+        if total_statements == 0:
+            st.warning("No statements available. Please select statements or add custom statements.")
+        
+        # Display selected statements
+        if global_settings.get("selected_statements", []):
+            st.subheader("Selected Statements")
+            selected_texts = [statements[i] for i in global_settings.get("selected_statements", [])]
+            selected_df = pd.DataFrame({"Statement": selected_texts})
+            st.dataframe(selected_df, use_container_width=True, hide_index=True)
+        
+        # Display custom statements
+        if global_settings.get("custom_statements", []):
+            st.subheader("Custom Statements")
+            custom_df = pd.DataFrame({"Statement": global_settings.get("custom_statements", [])})
+            st.dataframe(custom_df, use_container_width=True, hide_index=True)
+    
+    # Единственная кнопка Save All Settings в конце страницы
+    if st.button("Save All Settings", key="save_all_settings_main"):
+        if save_global_settings("user_settings", global_settings):
+            st.success("Settings saved successfully!")
+        else:
+            st.error("Failed to save settings. Please try again.") 
