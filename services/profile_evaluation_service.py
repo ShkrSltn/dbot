@@ -1,5 +1,6 @@
 # services/evaluation_service.py
 import logging
+import json
 from typing import Dict, Any, Optional, List, Tuple
 
 from langchain.prompts import ChatPromptTemplate
@@ -32,7 +33,7 @@ def evaluate_profile_with_ai(profile_data: Dict[str, Any]) -> Dict[str, Any]:
                 "suggestion": ""
             }
         
-        # Create the evaluation prompt
+        # Create the evaluation prompt with improved criteria based on completeness, clarity, and credibility
         prompt = ChatPromptTemplate.from_template("""
         You are an expert career coach helping users create effective digital skills profiles.
         
@@ -43,32 +44,39 @@ def evaluate_profile_with_ai(profile_data: Dict[str, Any]) -> Dict[str, Any]:
         - Digital proficiency level: {digital_proficiency}
         - Primary tasks description: {primary_tasks}
         
-        Evaluate the profile information and provide feedback:
+        Evaluate the profile information with these criteria:
         
-        1. Validate all fields:
-           - Is the job role a real profession or position? (Yes/No)
-           - Is the job domain a legitimate industry or field? (Yes/No)
-           - Is the primary tasks description relevant to the job role? (Yes/No)
-           - Does the primary tasks description contain actual work activities? (Yes/No)
-           - Is the content coherent and not just random text or symbols? (Yes/No)
+        1. Completeness (1-5 scale):
+           - Is the job role a real profession or position?
+           - Is the job domain a legitimate industry or field?
+           - Is the primary tasks description detailed and comprehensive?
+           - Does it include sufficient information about digital skills?
         
-        2. Evaluate the primary tasks description:
-           - Is it specific and clear?
-           - Does it highlight digital skills or technology use?
-           - Is it action-oriented?
+        2. Clarity (1-5 scale):
+           - Is the primary tasks description clear and easy to understand?
+           - Are the tasks specific and action-oriented?
+           - Is the language precise and professional?
+        
+        3. Credibility (1-5 scale):
+           - Is the primary tasks description relevant to the job role?
+           - Does it contain actual work activities?
+           - Is the content coherent and not just random text or symbols?
            - Is it appropriate for the stated job role and domain?
         
-        3. Provide a suggested improved version of the primary tasks description that:
+        4. Provide a suggested improved version of the primary tasks description that:
            - Maintains the user's intent
            - Is more specific and action-oriented
            - Highlights digital skills relevance
            - Is appropriate for their job role and domain
         
         Format your response as a JSON object with these keys:
-        - is_good: boolean (true if all validations pass and the description is good, false if any issues found)
-        - feedback: string (brief constructive feedback about all fields, highlighting any issues)
+        - is_good: boolean (true if all criteria score at least 3, false otherwise)
+        - feedback: string (constructive feedback highlighting strengths and areas for improvement)
         - suggestion: string (an improved version of the primary tasks description)
         - invalid_fields: array of strings (names of fields that contain invalid or nonsensical input, if any)
+        - completeness: integer (1-5 score)
+        - clarity: integer (1-5 score)
+        - credibility: integer (1-5 score)
         """)
         
         # Get the LLM model
@@ -101,7 +109,6 @@ def evaluate_profile_with_ai(profile_data: Dict[str, Any]) -> Dict[str, Any]:
         })
         
         # Parse the result - the model should return JSON
-        import json
         try:
             # Try to extract JSON from the response
             response_text = result.content
@@ -112,9 +119,18 @@ def evaluate_profile_with_ai(profile_data: Dict[str, Any]) -> Dict[str, Any]:
                 json_str = response_text[json_start:json_end]
                 evaluation = json.loads(json_str)
                 
+                # Determine if the profile is good based on scores
+                scores = [
+                    evaluation.get("completeness", 0),
+                    evaluation.get("clarity", 0),
+                    evaluation.get("credibility", 0)
+                ]
+                
+                # Profile is good if all scores are at least 3
+                is_good = all(score >= 3 for score in scores)
+                evaluation["is_good"] = is_good
+                
                 # Ensure all expected keys are present
-                if "is_good" not in evaluation:
-                    evaluation["is_good"] = False
                 if "feedback" not in evaluation:
                     evaluation["feedback"] = "Please provide valid information in all fields."
                 if "suggestion" not in evaluation:
