@@ -3,7 +3,7 @@ import pandas as pd
 from services.statement_service import get_all_statements
 from services.db.crud._settings import get_global_settings, save_global_settings
 from services.db.crud._prompts import get_user_prompts, get_all_prompts
-from services.enrichment_service import DEFAULT_PROMPT
+from services.enrichment_service import DEFAULT_PROMPT, BASIC_PROMPT, DIGCOMP_FEW_SHOT_PROMPT, GENERAL_FEW_SHOT_PROMPT
 
 def display_user_settings():
     st.title("⚙️ Global Settings")
@@ -180,32 +180,58 @@ def display_user_settings():
             custom_df = pd.DataFrame({"Statement": global_settings.get("custom_statements", [])})
             st.dataframe(custom_df, use_container_width=True, hide_index=True)
     
-    # Tab 4: AI Features Settings
+    # Tab 4: AI Features
     with settings_tabs[3]:
         st.subheader("AI Features")
         st.markdown("""
-        Enable or disable AI-powered features in the application.
+        Configure AI-powered features and evaluation settings.
         """)
         
-        # Initialize profile_evaluation_enabled if it doesn't exist
-        if "profile_evaluation_enabled" not in global_settings:
-            global_settings["profile_evaluation_enabled"] = True
-        
-        # Toggle for profile evaluation
+        # Profile evaluation settings
+        st.markdown("### Profile Evaluation")
         profile_evaluation_enabled = st.toggle(
-            "Enable Profile Evaluation with AI",
+            "Enable AI Profile Evaluation", 
             value=global_settings.get("profile_evaluation_enabled", True),
             help="When enabled, AI will evaluate user profiles and provide suggestions for improvement."
         )
         
-        # Update settings
+        # Update global settings
         global_settings["profile_evaluation_enabled"] = profile_evaluation_enabled
         
-        # Explanation of the feature
-        if profile_evaluation_enabled:
-            st.success("Profile evaluation with AI is enabled. Users will receive AI-powered suggestions to improve their profiles.")
+        # Statement generation settings
+        st.markdown("### Statement Generation")
+        
+        # Toggle for evaluation mode
+        evaluation_enabled = st.toggle(
+            "Enable Multiple Attempts (Threshold-based Generation)", 
+            value=global_settings.get("evaluation_enabled", True),
+            help="When enabled, the system will generate multiple versions of statements and select the best one based on quality thresholds."
+        )
+        
+        # Update global settings
+        global_settings["evaluation_enabled"] = evaluation_enabled
+        
+        # Explanation
+        if evaluation_enabled:
+            st.info("The system will generate multiple versions of statements and select the best one based on quality thresholds.")
         else:
-            st.info("Profile evaluation with AI is disabled. Users will not receive AI-powered suggestions for their profiles.")
+            st.info("The system will generate a single version of statements without evaluation.")
+        
+        # Slider for max attempts (only shown if evaluation is enabled)
+        if evaluation_enabled:
+            max_attempts = st.slider(
+                "Maximum Generation Attempts", 
+                min_value=1, 
+                max_value=10, 
+                value=global_settings.get("evaluation_max_attempts", 5),
+                help="Maximum number of attempts to generate a statement that meets quality thresholds."
+            )
+            
+            # Update global settings
+            global_settings["evaluation_max_attempts"] = max_attempts
+        else:
+            # Set a default value when disabled
+            global_settings["evaluation_max_attempts"] = 1
     
     # Tab 5: Prompt Settings
     with settings_tabs[4]:
@@ -220,16 +246,39 @@ def display_user_settings():
         
         if not all_prompts:
             st.warning("No custom prompts found. Using default prompt.")
-            # Add default prompt to the list
-            all_prompts = [{
-                "id": 0,
-                "user_id": None,
-                "name": "Default",
-                "content": DEFAULT_PROMPT,
-                "created_at": None
-            }]
+            # Add default prompts to the list
+            all_prompts = [
+                {
+                    "id": 0,
+                    "user_id": None,
+                    "name": "Default",
+                    "content": DEFAULT_PROMPT, 
+                    "created_at": None
+                },
+                {
+                    "id": -1,
+                    "user_id": None,
+                    "name": "Basic",
+                    "content": BASIC_PROMPT,
+                    "created_at": None
+                },
+                {
+                    "id": -2,
+                    "user_id": None,
+                    "name": "DigComp Few-Shot",
+                    "content": DIGCOMP_FEW_SHOT_PROMPT,
+                    "created_at": None
+                },
+                {
+                    "id": -3,
+                    "user_id": None,
+                    "name": "General Few-Shot",
+                    "content": GENERAL_FEW_SHOT_PROMPT,
+                    "created_at": None
+                }
+            ]
         else:
-            # Add default prompt to the beginning of the list
+            # Add default prompts to the beginning of the list
             all_prompts.insert(0, {
                 "id": 0,
                 "user_id": None,
@@ -237,7 +286,28 @@ def display_user_settings():
                 "content": DEFAULT_PROMPT,
                 "created_at": None
             })
-        
+            all_prompts.insert(1, {
+                "id": -1,
+                "user_id": None,
+                "name": "Basic",
+                "content": BASIC_PROMPT,
+                "created_at": None
+            })
+            all_prompts.insert(2, {
+                "id": -2,
+                "user_id": None,
+                "name": "DigComp Few-Shot",
+                "content": DIGCOMP_FEW_SHOT_PROMPT,
+                "created_at": None
+            })
+            all_prompts.insert(3, {
+                "id": -3,
+                "user_id": None,
+                "name": "General Few-Shot",
+                "content": GENERAL_FEW_SHOT_PROMPT,
+                "created_at": None
+            })
+
         # Create a dictionary of prompt names to IDs for the selectbox
         prompt_options = {p["name"]: p["id"] for p in all_prompts}
         
@@ -284,7 +354,9 @@ def display_user_settings():
                 "Custom Statements",
                 "Total Statements",
                 "Statements Per Quiz",
-                "Profile Evaluation"
+                "Profile Evaluation",
+                "Statement Generation",
+                "Max Generation Attempts"
             ],
             "Value": [
                 str(len(global_settings.get("selected_statements", []))),
@@ -292,7 +364,9 @@ def display_user_settings():
                 str(len(global_settings.get("selected_statements", [])) + 
                 len(global_settings.get("custom_statements", []))),
                 str(global_settings.get("max_statements_per_quiz", 5)),
-                "Enabled" if global_settings.get("profile_evaluation_enabled", True) else "Disabled"
+                "Enabled" if global_settings.get("profile_evaluation_enabled", True) else "Disabled",
+                "Multiple Attempts" if global_settings.get("evaluation_enabled", True) else "Single Attempt",
+                str(global_settings.get("evaluation_max_attempts", 5))
             ]
         }
         

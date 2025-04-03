@@ -30,11 +30,49 @@ def handle_empty_statements():
         context = ", ".join(
             [f"{k.replace('_', ' ').title()}: {v}" for k, v in st.session_state.profile.items() if v])
         
+        # Get generation settings from global settings
+        from services.db.crud._settings import get_global_settings
+        global_settings = get_global_settings("user_settings")
+        
+        evaluation_enabled = global_settings.get("evaluation_enabled", True) if global_settings else True
+        max_attempts = global_settings.get("evaluation_max_attempts", 5) if global_settings else 5
+        
         # Enrich statements
         with st.spinner("Generating sample statements..."):
             for statement in sample_statements:
-                enriched = enrich_statement_with_llm(context, statement, 150)
-                metrics = calculate_quality_metrics(statement, enriched)
+                # Choose generation method based on settings
+                if evaluation_enabled:
+                    # Use threshold-based generation with multiple attempts
+                    from services.statement_evaluation_service import regenerate_until_threshold
+                    
+                    # Get proficiency level from profile or use default
+                    proficiency = st.session_state.profile.get("digital_proficiency", "Intermediate")
+                    if isinstance(proficiency, int):
+                        # Convert numeric proficiency to string
+                        proficiency_map = {
+                            1: "Beginner",
+                            2: "Basic",
+                            3: "Intermediate", 
+                            4: "Advanced",
+                            5: "Expert"
+                        }
+                        proficiency = proficiency_map.get(proficiency, "Intermediate")
+                    
+                    # Generate with multiple attempts
+                    _, enriched, _, _, history = regenerate_until_threshold(
+                        context=context,
+                        original_statement=statement,
+                        proficiency=proficiency,
+                        statement_length=150,
+                        max_attempts=max_attempts
+                    )
+                    
+                    # Get metrics from the best attempt
+                    metrics = history[-1]["metrics"] if history else calculate_quality_metrics(statement, enriched)
+                else:
+                    # Use simple generation (single attempt)
+                    enriched = enrich_statement_with_llm(context, statement, 150)
+                    metrics = calculate_quality_metrics(statement, enriched)
                 
                 if 'enriched_statements' not in st.session_state:
                     st.session_state.enriched_statements = []

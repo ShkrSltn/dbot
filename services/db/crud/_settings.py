@@ -69,11 +69,14 @@ def get_global_settings(key="user_settings"):
         if settings:
             return settings.value
         else:
-            # Default settings
+            # Default settings with evaluation settings
             default_settings = {
                 "selected_categories": [],
                 "custom_statements": [],
-                "max_statements_per_quiz": 5
+                "max_statements_per_quiz": 5,
+                "evaluation_enabled": True,
+                "evaluation_max_attempts": 5,
+                "selected_prompt_id": 0
             }
             
             # Create settings if they don't exist

@@ -118,7 +118,7 @@ def run_app():
                         st.session_state.user = user
                         st.session_state.current_role = user["role"]
                 else:
-                    # Invalid session token, clear query params
+                    # Clear query params on error
                     st.query_params.clear()
         except Exception as e:
             print(f"Error restoring session: {e}")
@@ -225,9 +225,15 @@ def run_app():
     if st.session_state.current_role == "admin":
         page = st.sidebar.radio(
             "Navigation",
-            ["Home", "User Settings", "User Journey", "Profile Builder", 
-             "Enrichment Demo", "Batch Enrichment", "Quiz", "Chatbot", "Analytics", "Prompt Engineer"]
+            ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
         )
+        
+        # Add Legacy Pages dropdown
+        if page == "Legacy Pages":
+            legacy_page = st.sidebar.selectbox(
+                "Select Legacy Page",
+                ["Profile Builder", "Enrichment Demo", "Batch Enrichment", "Quiz"]
+            )
     else:
         page = "User Journey"
     
@@ -239,20 +245,21 @@ def run_app():
             display_home_page()
         elif page == "User Settings":
             display_user_settings()
-        elif page == "Profile Builder":
-            display_profile_builder()
-        elif page == "Enrichment Demo":
-            display_enrichment_demo(sample_statements)
-        elif page == "Batch Enrichment":
-            display_batch_enrichment(sample_statements)
-        elif page == "Quiz":
-            display_quiz()
         elif page == "Chatbot":
             display_chatbot()
         elif page == "Analytics":
             display_analytics()
         elif page == "Prompt Engineer":
             display_prompt_engineer(sample_statements)
+        elif page == "Legacy Pages":
+            if legacy_page == "Profile Builder":
+                display_profile_builder()
+            elif legacy_page == "Enrichment Demo":
+                display_enrichment_demo(sample_statements)
+            elif legacy_page == "Batch Enrichment":
+                display_batch_enrichment(sample_statements)
+            elif legacy_page == "Quiz":
+                display_quiz()
 
     # Add footer
     st.markdown("---")

@@ -48,6 +48,18 @@ def initialize_app():
         init_db()
         print("DEBUG: Database initialized")
         
+        # Make sure all required page modules are available
+        try:
+            from pages.profile_builder import display_profile_builder
+            from pages.enrichment_demo import display_enrichment_demo
+            from pages.batch_enrichment import display_batch_enrichment
+            from pages.quiz import display_quiz
+            print("DEBUG: All legacy page modules imported successfully")
+        except ImportError as e:
+            print(f"DEBUG: Error importing page modules: {e}")
+            st.error(f"Error importing page modules: {e}")
+            return False
+        
         return True
         
     except Exception as e:
