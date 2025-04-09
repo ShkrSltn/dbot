@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from ..models import QuizResult
 from ..connection import get_database_connection
 
-def save_quiz_results(user_id, original_score, enriched_score, neither_score, detailed_results, is_final=False):
+def save_quiz_results(user_id, original_score, enriched_score, neither_score, detailed_results, competency_results=None, is_final=False):
     """
     Save quiz results to the database
     
@@ -15,6 +15,7 @@ def save_quiz_results(user_id, original_score, enriched_score, neither_score, de
     - enriched_score: Score for enriched statements
     - neither_score: Score for "neither" preference
     - detailed_results: Detailed breakdown of results
+    - competency_results: Results of competency assessment
     - is_final: Flag indicating if this is the final submission for this quiz attempt
     
     Returns:
@@ -44,6 +45,7 @@ def save_quiz_results(user_id, original_score, enriched_score, neither_score, de
             enriched_preference=enriched_score,
             neither_preference=neither_score,
             detailed_results=detailed_results,
+            competency_results=competency_results,
             created_at=datetime.datetime.utcnow()
         )
         session.add(quiz_result)
@@ -118,6 +120,7 @@ def get_quiz_results_list(user_id):
             "enriched": result.enriched_preference,
             "neither": result.neither_preference,
             "detailed_results": result.detailed_results,
+            "competency_results": result.competency_results,
             "created_at": result.created_at
         } for result in quiz_results]
     except Exception as e:

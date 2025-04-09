@@ -81,11 +81,6 @@ def display_auth():
                 else:
                     st.error(f"Failed to create demo account: {anon_result.get('error', 'Unknown error')}")
             
-            # Add demo credentials
-            st.markdown("---")
-            st.caption("Or use these test accounts:")
-            st.caption("Admin: admin1 / admin1pass")
-            st.caption("User: user1 / user1pass")
     else:
         # Show logged in state
         st.success(f"Logged in as {st.session_state.user['username']} ({st.session_state.current_role})")

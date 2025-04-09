@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from services.db.crud._quiz import get_quiz_results_all_users
+from components.meta_questions import get_default_criteria
 
 def display_analytics():
     st.title("📊 Analytics Dashboard")
@@ -21,20 +22,25 @@ def display_analytics():
     total_enriched = sum(result["enriched"] for result in all_quiz_results)
     total_responses = total_original + total_enriched
     
+    # Get default criteria to use the right keys
+    default_criteria = get_default_criteria()
+    criteria_keys = list(default_criteria.keys())
+    
     # Aggregate detailed results
     aggregated_detailed_results = {
-        "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-        "read": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-        "detail": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-        "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-        "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
+        key: {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, 
+              "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0} 
+        for key in criteria_keys
     }
     
     for result in all_quiz_results:
-        detailed = result["detailed_results"]
-        for criterion in aggregated_detailed_results:
-            for preference in aggregated_detailed_results[criterion]:
-                aggregated_detailed_results[criterion][preference] += detailed[criterion][preference]
+        detailed = result.get("detailed_results", {})
+        for criterion in criteria_keys:
+            if criterion in detailed:
+                criterion_data = detailed[criterion]
+                for preference in aggregated_detailed_results[criterion]:
+                    if preference in criterion_data:
+                        aggregated_detailed_results[criterion][preference] += criterion_data[preference]
 
     # Display overall results
     st.subheader("Overall Statement Preferences")
@@ -87,7 +93,8 @@ def display_analytics():
         st.subheader("Detailed Analysis by Criteria")
         
         # Create tabs for detailed analysis
-        detailed_tabs = st.tabs(["Understanding", "Readability", "Detail", "Professional Fit", "Self-Assessment"])
+        tab_titles = ["Understanding", "Readability", "Detail", "Professional Fit", "Self-Assessment"]
+        detailed_tabs = st.tabs(tab_titles)
         
         criteria_names = {
             "understand": "Which statement is easier to understand?",
@@ -96,8 +103,6 @@ def display_analytics():
             "profession": "Which statement fits profession better?",
             "assessment": "Which statement is more helpful for self-assessment?"
         }
-        
-        criteria_keys = ["understand", "read", "detail", "profession", "assessment"]
         
         for tab, key in zip(detailed_tabs, criteria_keys):
             with tab:
@@ -177,7 +182,7 @@ def display_analytics():
                     )
                 
                 fig.update_layout(
-                    title=criteria_names[key],
+                    title=criteria_names.get(key, key.capitalize()),
                     xaxis=dict(
                         title="Preference",
                         tickangle=-45

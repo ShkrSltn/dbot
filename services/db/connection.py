@@ -10,17 +10,17 @@ import uuid
 # Load environment variables
 load_dotenv()
 
-# Функция для создания соединения с базой данных
+# Function to create a database connection
 @st.cache_resource
 def get_database_engine():
-    # Получаем строку подключения из переменных окружения или используем значение по умолчанию
+    # Get the database connection string from environment variables or use the default value
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/digibot")
     
     try:
-        # Создаем движок SQLAlchemy
+        # Create the SQLAlchemy engine
         engine = create_engine(DATABASE_URL)
         
-        # Создаем все таблицы, если они не существуют
+        # Create all tables if they don't exist
         Base.metadata.create_all(engine)
         
         return engine
@@ -33,7 +33,7 @@ def get_database_connection():
     if not engine:
         return None
     
-    # Создаем новую сессию для каждого запроса
+    # Create a new session for each request
     Session = sessionmaker(bind=engine)
     
     return {"engine": engine, "Session": Session}
@@ -90,7 +90,7 @@ def verify_session_token(user_id, token):
     
     session = db["Session"]()
     try:
-        # Проверяем токен в базе данных
+        # Check the token in the database
         session_record = session.query(UserSession).filter_by(
             user_id=user_id, 
             token=token,
@@ -98,11 +98,11 @@ def verify_session_token(user_id, token):
         ).first()
         
         if session_record:
-            # Проверяем, не истек ли срок действия токена
+            # Check if the token has expired
             if session_record.expires_at > datetime.datetime.utcnow():
                 return True
             else:
-                # Помечаем токен как истекший
+                # Mark the token as expired
                 session_record.expired = True
                 session.commit()
         return False
