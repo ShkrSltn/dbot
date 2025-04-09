@@ -89,6 +89,20 @@ def run_app():
         [data-testid="stSidebarNav"] {
             display: none;
         }
+        /* Disable automatic sidebar expansion on mobile */
+        @media (max-width: 640px) {
+            .st-emotion-cache-1cypcdb .st-emotion-cache-1egp7fm {
+                margin-top: 0;
+            }
+            /* Force sidebar to stay collapsed on mobile */
+            [data-testid="collapsedControl"] {
+                display: block;
+            }
+            /* Remove sidebar auto-expansion */
+            .st-emotion-cache-uf99v8 {
+                display: none;
+            }
+        }
         </style>
     """, unsafe_allow_html=True)
 

@@ -70,6 +70,7 @@ class QuizResult(Base):
     enriched_preference = Column(Integer, default=0)
     neither_preference = Column(Integer, default=0)
     detailed_results = Column(JSON, default={})
+    competency_results = Column(JSON, default=[])
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow)
     

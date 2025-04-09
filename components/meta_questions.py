@@ -49,17 +49,6 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
             
             # Store competency response
             responses["competency"] = competency
-            
-            # Map radio button selection to competency level for data analysis
-            competency_level_map = {
-                "I have no knowledge of this / I never heard of this": "No knowledge",
-                "I have only a limited understanding of this and need more explanations": "Basic",
-                "I have a good understanding of this": "Intermediate", 
-                "I fully master this topic/issue and I could explain it to others": "Advanced"
-            }
-            
-            if competency in competency_level_map:
-                responses["competency_level"] = competency_level_map[competency]
     
     # Добавляем разделительную линию без отступов
     divider_html = """
@@ -70,13 +59,12 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
     st.markdown(divider_html, unsafe_allow_html=True)
     
     # Затем показываем вопросы про критерии
-    st.markdown('<div class="meta-questions-header">Meta Questions</div>', unsafe_allow_html=True)
+    # st.markdown('<div class="meta-questions-header">Meta Questions</div>', unsafe_allow_html=True)
 
     # Desktop headers
     desktop_header_html = """
     <div class="desktop-header">
         <div class="header-cols">
-        <div class="criteria-header">Criteria</div>
             <div class="header-cols-items">  
                 <div class="header-left-left">Completely Prefer A</div>
                 <div class="header-left">Somewhat Prefer A</div>
@@ -181,7 +169,7 @@ def get_meta_questions_styles():
     <style>
         /* Background стиль для соответствия скриншоту */
         div.stRadio > div {
-            background-color: #171717;
+            background-color: #252633;
             border-radius: 3px;
             padding: 1px 0;
         }

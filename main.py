@@ -24,14 +24,28 @@ def initialize_app():
             page_title="DigiBot",
             page_icon=":robot:",
             layout="wide",
-            initial_sidebar_state="expanded"
+            initial_sidebar_state="collapsed"
         )
         
-        # Hide default sidebar navigation
+        # Hide default sidebar navigation and customize sidebar behavior on mobile
         st.markdown("""
             <style>
             [data-testid="stSidebarNav"] {
                 display: none;
+            }
+            /* Disable automatic sidebar expansion on mobile */
+            @media (max-width: 640px) {
+                .st-emotion-cache-1cypcdb .st-emotion-cache-1egp7fm {
+                    margin-top: 0;
+                }
+                /* Force sidebar to stay collapsed on mobile */
+                [data-testid="collapsedControl"] {
+                    display: block;
+                }
+                /* Remove sidebar auto-expansion */
+                .st-emotion-cache-uf99v8 {
+                    display: none;
+                }
             }
             </style>
         """, unsafe_allow_html=True)

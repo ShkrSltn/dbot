@@ -119,6 +119,11 @@ def display_profile_step():
                 if profile_evaluation_enabled:
                     with st.spinner("AI is analyzing your profile..."):
                         st.session_state.ai_evaluation = evaluate_profile_with_ai(current_profile)
+                        
+                        # If profile is good, automatically proceed to quiz
+                        if st.session_state.ai_evaluation.get("is_good", True):
+                            handle_profile_submission(job_role, job_domain, years_experience, digital_proficiency, primary_tasks)
+                            return
                 
                 st.rerun()
                 
@@ -146,7 +151,9 @@ def display_profile_step():
                             del st.session_state.ai_evaluation
                         st.rerun()
         else:
-            st.success("Your profile looks good! You can now save it.")
+            st.success("Your profile looks good! Proceeding to quiz...")
+            # Automatically save and proceed to next step
+            handle_profile_submission(job_role, job_domain, years_experience, digital_proficiency, primary_tasks)
 
 def handle_profile_submission(job_role, job_domain, years_experience, digital_proficiency, primary_tasks):
     # Validate that required fields are filled

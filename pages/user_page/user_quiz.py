@@ -5,6 +5,9 @@ from services.enrichment_service import enrich_statement_with_llm
 from services.metrics_service import calculate_quality_metrics
 from services.db.crud._quiz import save_quiz_results
 from components.meta_questions import display_meta_questions, get_default_criteria, get_competency_criteria, get_meta_questions_styles
+from services.db.crud._settings import get_competency_questions_enabled
+import random  # Добавляем импорт для рандомизации
+import datetime
 
 def display_quiz_step():
     st.subheader("Step 2: Statement Preference Quiz")
@@ -105,6 +108,10 @@ def display_quiz_interface():
     if 'quiz_shown_indices' not in st.session_state:
         st.session_state.quiz_shown_indices = []
     
+    # Инициализируем словарь для хранения информации о порядке утверждений, если его еще нет
+    if 'statement_order' not in st.session_state:
+        st.session_state.statement_order = {}
+    
     # Get max statements from settings
     max_statements = get_max_statements_setting()
     
@@ -144,22 +151,90 @@ def display_quiz_interface():
         for i, statement_idx in enumerate(st.session_state.current_statements):
             statement_pair = st.session_state.enriched_statements[statement_idx]
             
-            # Always set original on the left (A) and enriched on the right (B)
-            first_is_original = True
+            # Случайно определяем порядок отображения (оригинал - A или B)
+            order_key = f"order_{statement_idx}_{quiz_iteration_key}"
+            if order_key not in st.session_state:
+                # Случайно определяем, будет ли оригинал первым (A) или вторым (B)
+                first_is_original = random.choice([True, False])
+                st.session_state[order_key] = first_is_original
+            else:
+                first_is_original = st.session_state[order_key]
             
-            first_statement = statement_pair["original"]
-            second_statement = statement_pair["enriched"]
+            # Сохраняем порядок утверждений для использования при обработке результатов
+            st.session_state.statement_order[statement_idx] = first_is_original
             
-            st.markdown(f"## Statement Pair {i+1}")
+            # Определяем, какое утверждение будет первым (A), а какое вторым (B)
+            if first_is_original:
+                first_statement = statement_pair["original"]
+                second_statement = statement_pair["enriched"]
+            else:
+                first_statement = statement_pair["enriched"]
+                second_statement = statement_pair["original"]
             
-            # Display the statements side by side
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("### A")
-                st.info(first_statement)
-            with col2:
-                st.markdown("### B")
-                st.info(second_statement)
+            # Получаем категорию и подкатегорию для заголовка
+            category = statement_pair.get("category", "")
+            # subcategory = statement_pair.get("subcategory", "")
+            
+            st.markdown("---")
+            # Отображаем категорию вместо "Statement Pair"
+            st.markdown(f"## {category if category else f'Statement Pair {i+1}'}")
+            
+            # Если есть подкатегория, отображаем ее как подзаголовок
+            # if subcategory:
+            #     st.markdown(f"### {subcategory}")
+            
+            # Create CSS for equal height containers
+            st.markdown("""
+            <style>
+            .statement-container {
+                display: flex;
+                width: 100%;
+                margin-bottom: 20px;
+
+            }
+            .statement-box {
+                flex: 1;
+                margin: 0 10px;
+                padding: 15px;
+                border-radius: 5px;
+                background-color: #0c5f97;
+            }
+            .statement-title {
+                font-size: 1.2rem;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+
+            @media (max-width: 768px) {
+                .statement-container {
+                    gap: 10px;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .statement-box {
+                    flex: 1;
+                    min-height: 150px;
+                    width: 100%;
+                }
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Display the statements side by side with equal height using HTML
+            html_content = f"""
+            <div class="statement-container">
+                <div class="statement-box">
+                    <div class="statement-title">A</div>
+                    <div>{first_statement}</div>
+                </div>
+                <div class="statement-box">
+                    <div class="statement-title">B</div>
+                    <div>{second_statement}</div>
+                </div>
+            </div>
+            """
+            st.markdown(html_content, unsafe_allow_html=True)
             
             st.markdown("#### Your Preference")
             
@@ -172,37 +247,53 @@ def display_quiz_interface():
                 quiz_iteration_key=quiz_iteration_key,
                 criteria=criteria,
                 first_is_original=first_is_original,
-                statement=first_statement,
-                show_competency=st.session_state.get("user_settings", {}).get("competency_questions_enabled", True)
+                statement=statement_pair["original"],  # Всегда передаем оригинальное утверждение для компетенций
+                show_competency=get_competency_questions_enabled()
             )
         
         # Progress indicator
         completed = len(st.session_state.quiz_shown_indices)
         progress_percentage = completed / total_statements * 100
-        st.progress(progress_percentage / 100, f"{progress_percentage:.0f}% ({completed}/{total_statements})")
+        # st.progress(progress_percentage / 100, f"{progress_percentage:.0f}% ({completed}/{total_statements})")
         
         # Submit button for all statements
         submitted = st.form_submit_button("Submit All Responses")
         
     if submitted:
-        # Validate that all questions have been answered
+        # Добавим отладку для проверки значений
+        # st.write("Debug info:")
         all_answered = True
         unanswered_questions = []
+        
+        # Проверка всех ответов
         for statement_idx in st.session_state.current_statements:
+            # st.write(f"Checking statement {statement_idx}")
+            
+            # Проверка мета-вопросов
             for key in criteria.keys():
                 radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
-                if radio_key not in st.session_state or st.session_state[radio_key] is None:
+                value = st.session_state.get(radio_key)
+                # st.write(f"{radio_key}: {value}")
+                
+                if value is None:
                     all_answered = False
-                    unanswered_questions.append(f"Statement Pair {st.session_state.current_statements.index(statement_idx)+1}: {criteria[key]}")
+                    unanswered_questions.append(f"Statement {statement_idx}: {criteria[key]}")
             
-            # Check competency questions
-            if st.session_state.get("user_settings", {}).get("competency_questions_enabled", True):
+            # Проверка компетенций только если они включены
+            competency_enabled = get_competency_questions_enabled()
+            if competency_enabled:
                 competency_key = f"competency_{statement_idx}_{quiz_iteration_key}"
+                comp_value = st.session_state.get(competency_key)
+                # st.write(f"{competency_key}: {comp_value}")
                 
-                if competency_key not in st.session_state or st.session_state[competency_key] is None:
+                if comp_value is None:
                     all_answered = False
-                    unanswered_questions.append(f"Statement Pair {st.session_state.current_statements.index(statement_idx)+1}: Competency assessment")
-                
+                    unanswered_questions.append(f"Statement {statement_idx}: Competency")
+        
+        # st.write(f"All answered: {all_answered}")
+        # st.write(f"Unanswered: {unanswered_questions}")
+        
+        # Original validation code...
         if not all_answered:
             st.error("Please answer all questions before submitting:")
             for question in unanswered_questions:
@@ -217,10 +308,10 @@ def display_quiz_interface():
                 radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
                 responses[key] = st.session_state[radio_key]
             
-            # Add competency responses
-            if st.session_state.get("user_settings", {}).get("competency_questions_enabled", True):
+            # Add competency responses only if enabled
+            competency_enabled = get_competency_questions_enabled()
+            if competency_enabled:
                 competency_key = f"competency_{statement_idx}_{quiz_iteration_key}"
-                
                 responses["competency"] = st.session_state.get(competency_key)
             
             # Add category and subcategory
@@ -230,8 +321,11 @@ def display_quiz_interface():
             responses["category"] = st.session_state.get(cat_key)
             responses["subcategory"] = st.session_state.get(subcat_key)
             
+            # Получаем порядок отображения для этого утверждения
+            first_is_original = st.session_state.statement_order.get(statement_idx, True)
+            
             # Handle the submission for this statement
-            handle_quiz_submission(statement_idx, responses, first_is_original=True)
+            handle_quiz_submission(statement_idx, responses, first_is_original)
         
         # Reset for next batch of questions if needed
         st.session_state.current_quiz_iteration += 1
@@ -263,7 +357,10 @@ def handle_quiz_submission(statement_idx, responses, first_is_original):
     quiz_iteration_key = f"quiz_iteration_{current_quiz_iteration}"
     
     # Validate responses for completeness
-    if None in responses.values() or "" in responses.values():
+    required_keys = list(get_default_criteria().keys())
+    missing_values = [key for key in required_keys if key in responses and (responses[key] is None or responses[key] == "")]
+    
+    if missing_values:
         st.error(f"Please complete all questions for Statement Pair {statement_idx+1}")
         return False
     
@@ -313,16 +410,17 @@ def handle_quiz_submission(statement_idx, responses, first_is_original):
                 else:
                     st.session_state.detailed_quiz_results[key]["completely_prefer_original"] += 1
     
-    # Store competency results
-    competency_data = {
-        "statement_idx": statement_idx,
-        "competency": responses.get("competency"),
-        "category": responses.get("category"),
-        "subcategory": responses.get("subcategory"),
-        "statement": st.session_state.enriched_statements[statement_idx]["original"]
-    }
-    
-    st.session_state.competency_results.append(competency_data)
+    # Store competency results with proper structure only if competency exists in responses
+    if "competency" in responses and responses["competency"] is not None:
+        competency_data = {
+            "statement_idx": statement_idx,
+            "competency": responses.get("competency"),  # Сохраняем только полный текст ответа
+            "category": responses.get("category"),
+            "subcategory": responses.get("subcategory"),
+            "statement": st.session_state.enriched_statements[statement_idx]["original"]
+        }
+        
+        st.session_state.competency_results.append(competency_data)
     
     # Calculate an overall preference based on the average across all criteria
     meta_keys = list(get_default_criteria().keys())
@@ -363,13 +461,19 @@ def handle_quiz_submission(statement_idx, responses, first_is_original):
     
     # If this is the final statement, save and move on
     if is_final:
+        # Get current datetime for saving results
+        current_datetime = datetime.datetime.utcnow()
+        
+        # Убедимся, что competency_results имеет правильную структуру перед сохранением
+        competency_results_to_save = st.session_state.competency_results
+        
         save_quiz_results(
             st.session_state.user["id"],
             original_count,
             enriched_count,
             neither_count,
             st.session_state.detailed_quiz_results,
-            competency_results=st.session_state.competency_results,
+            competency_results=competency_results_to_save,
             is_final=is_final
         )
         from services.db.crud._quiz import get_quiz_results_list

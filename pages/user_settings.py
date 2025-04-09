@@ -597,7 +597,8 @@ def display_user_settings():
         # Add profile evaluation to summary
         summary_data = {
             "Setting": [
-                "Selected Statements",
+                "Selected Categories",
+                "Selected Subcategories",
                 "Custom Statements",
                 "Total Statements",
                 "Statements Per Quiz",
@@ -606,7 +607,8 @@ def display_user_settings():
                 "Max Generation Attempts"
             ],
             "Value": [
-                str(len(global_settings.get("selected_statements", []))),
+                str(len(global_settings.get("selected_categories", []))),
+                str(sum(len(subcats) for subcats in global_settings.get("selected_subcategories", {}).values())),
                 str(len(global_settings.get("custom_statements", []))),
                 str(total_statements),
                 str(global_settings.get("max_statements_per_quiz", 5)),
@@ -625,12 +627,23 @@ def display_user_settings():
         if total_statements == 0:
             st.warning("No statements available. Please select statements or add custom statements.")
         
-        # Display selected statements
-        if global_settings.get("selected_statements", []):
-            st.subheader("Selected Statements")
-            selected_texts = [statements[i] for i in global_settings.get("selected_statements", [])]
-            selected_df = pd.DataFrame({"Statement": selected_texts})
-            st.dataframe(selected_df, use_container_width=True, hide_index=True)
+        # Display selected categories and subcategories
+        if global_settings.get("selected_categories", []):
+            st.subheader("Selected Categories")
+            categories_df = pd.DataFrame({"Category": global_settings.get("selected_categories", [])})
+            st.dataframe(categories_df, use_container_width=True, hide_index=True)
+        
+        # Display selected subcategories
+        selected_subcategories = global_settings.get("selected_subcategories", {})
+        if any(selected_subcategories.values()):
+            st.subheader("Selected Subcategories")
+            subcategories_data = []
+            for category, subcats in selected_subcategories.items():
+                for subcat in subcats:
+                    subcategories_data.append({"Category": category, "Subcategory": subcat})
+            if subcategories_data:
+                subcategories_df = pd.DataFrame(subcategories_data)
+                st.dataframe(subcategories_df, use_container_width=True, hide_index=True)
         
         # Display custom statements
         if global_settings.get("custom_statements", []):

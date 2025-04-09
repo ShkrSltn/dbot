@@ -76,7 +76,8 @@ def get_global_settings(key="user_settings"):
                 "max_statements_per_quiz": 5,
                 "evaluation_enabled": True,
                 "evaluation_max_attempts": 5,
-                "selected_prompt_id": 0
+                "selected_prompt_id": 0,
+                "competency_questions_enabled": True
             }
             
             # Create settings if they don't exist
@@ -120,4 +121,16 @@ def save_global_settings(key="user_settings", value=None):
         return False
     finally:
         session.close() 
-        
+
+
+def get_competency_questions_enabled():
+    """Get competency questions enabled setting from global settings
+    
+    Returns:
+        bool: True if competency questions are enabled, False otherwise
+    """
+    global_settings = get_global_settings("user_settings")
+    if global_settings is None:
+        return True  # Default to True if settings not available
+    
+    return global_settings.get("competency_questions_enabled", True)

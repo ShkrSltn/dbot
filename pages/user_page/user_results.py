@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 from services.db.crud._quiz import get_quiz_results_list
+from services.db.crud._settings import get_competency_questions_enabled
 
 def display_results_step():
     st.subheader("Step 3: Your Results")
@@ -34,12 +35,21 @@ def display_results_step():
         result_options = []
         for i, result in enumerate(st.session_state.previous_quiz_results):
             timestamp = result.get("created_at", "")
+            updated_timestamp = result.get("updated_at", "")
+            
             if timestamp:
                 # Format timestamp if it exists
                 if isinstance(timestamp, str):
                     attempt_label = f"Attempt {i+1} ({timestamp})"
                 else:
-                    attempt_label = f"Attempt {i+1} ({timestamp.strftime('%Y-%m-%d %H:%M')})"
+                    # Если есть время обновления и оно отличается от времени создания, показываем его
+                    if updated_timestamp and updated_timestamp != timestamp:
+                        if isinstance(updated_timestamp, str):
+                            attempt_label = f"Attempt {i+1} ({timestamp.strftime('%Y-%m-%d %H:%M')}, upd: {updated_timestamp})"
+                        else:
+                            attempt_label = f"Attempt {i+1} ({timestamp.strftime('%Y-%m-%d %H:%M')}, upd: {updated_timestamp.strftime('%Y-%m-%d %H:%M')})"
+                    else:
+                        attempt_label = f"Attempt {i+1} ({timestamp.strftime('%Y-%m-%d %H:%M')})"
             else:
                 attempt_label = f"Attempt {i+1}"
             result_options.append(attempt_label)
@@ -70,6 +80,17 @@ def display_results_step():
     # Use either selected previous result or current results
     if selected_result:
         display_results = selected_result
+        
+        # Добавим отображение даты создания и обновления, если они есть
+        created_at = display_results.get("created_at")
+        updated_at = display_results.get("updated_at")
+        
+        if created_at and not isinstance(created_at, str):
+            st.caption(f"Created: {created_at.strftime('%Y-%m-%d %H:%M')}")
+            
+            # Показываем дату обновления только если она отличается от даты создания
+            if updated_at and updated_at != created_at and not isinstance(updated_at, str):
+                st.caption(f"Last updated: {updated_at.strftime('%Y-%m-%d %H:%M')}")
     elif 'quiz_results' in st.session_state:
         display_results = {
             "original": st.session_state.quiz_results.get("original", 0),
@@ -95,7 +116,7 @@ def display_results_step():
                 st.rerun()
     else:
         # Проверяем настройку показа компетенций
-        show_competency_tab = st.session_state.get("user_settings", {}).get("competency_questions_enabled", True)
+        show_competency_tab = get_competency_questions_enabled()
 
         # Создаем вкладки в зависимости от настройки
         if show_competency_tab:
@@ -382,6 +403,7 @@ def display_competency_results(display_results):
     competency_results = display_results.get("competency_results", [])
     
     if not competency_results:
+        st.info("No competency assessment data available for this attempt.")
         return
     
     st.markdown("### Your Digital Competency Self-Assessment")
@@ -403,12 +425,17 @@ def display_competency_results(display_results):
     # Create a DataFrame
     df = pd.DataFrame(comp_data)
     
-    # Map from responses to levels
+    # Map from responses to levels - должен обрабатывать как длинные, так и короткие форматы
     response_to_level = {
         "I have no knowledge of this / I never heard of this": "No knowledge",
         "I have only a limited understanding of this and need more explanations": "Basic",
         "I have a good understanding of this": "Intermediate",
-        "I fully master this topic/issue and I could explain it to others": "Advanced"
+        "I fully master this topic/issue and I could explain it to others": "Advanced",
+        # Добавляем короткие форматы для обратной совместимости
+        "No knowledge": "No knowledge",
+        "Basic": "Basic",
+        "Intermediate": "Intermediate",
+        "Advanced": "Advanced"
     }
     
     # Add numeric mapping for competency for visualization
