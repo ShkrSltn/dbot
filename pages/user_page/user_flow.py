@@ -84,7 +84,7 @@ def initialize_session_state():
 
 # Progress bar and step indicators
 def display_progress_bar():
-    steps = ["Profile", "Quiz", "Results"]
+    steps = ["Profile", "Self-Assessment", "Results"]
     current_step = st.session_state.flow_step
     
     # Calculate progress percentage

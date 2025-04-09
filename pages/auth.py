@@ -13,9 +13,8 @@ def get_version_info():
         dict: Dictionary with version details
     """
     return {
-        "version": "1.0.0",
+        "version": "2.0.1",
         "name": "DigiBot",
-        "build_date": "2024-04-09",
         "description": "Tool for personalizing digital competency statements"
     }
 
@@ -24,8 +23,7 @@ def display_auth():
     st.title("🔐 DigiBot Authorization")
     
     version_info = get_version_info()
-    st.write(f"DigiBot v{version_info['version']} - {version_info['description']}")
-    st.write(f"Build date: {version_info['build_date']}")
+    st.write(f"DigiBot v{version_info['version']}")
     st.write("---")
 
     

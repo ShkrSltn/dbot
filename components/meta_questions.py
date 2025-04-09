@@ -27,12 +27,12 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
             st.session_state[cat_key] = category
             st.session_state[subcat_key] = subcategory
             
-            st.markdown("Answer according to your selection above:")
-            
+          
             # Add competency self-assessment using radio buttons like in the screenshot
             competency_key = f"competency_{statement_idx}_{quiz_iteration_key}"
             current_comp_value = st.session_state.get(competency_key)
-            
+
+       
             competency_options = [
                 "I have no knowledge of this / I never heard of this",
                 "I have only a limited understanding of this and need more explanations",
@@ -40,11 +40,15 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
                 "I fully master this topic/issue and I could explain it to others"
             ]
             
+            # Add h5 before radio
+            st.markdown("##### Select your competency level")
+            
             competency = st.radio(
-                "Select your competency level",
+                label="--",  
                 options=competency_options,
                 key=competency_key,
-                index=None if current_comp_value is None else competency_options.index(current_comp_value) if current_comp_value in competency_options else None
+                index=None if current_comp_value is None else competency_options.index(current_comp_value) if current_comp_value in competency_options else None,
+                label_visibility="collapsed"  # Hide the label
             )
             
             # Store competency response
@@ -75,7 +79,7 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
         </div>
     </div>
     """
-
+    st.markdown("##### Which statement do you prefer more?")
     st.markdown(desktop_header_html, unsafe_allow_html=True)
 
     # Mobile headers

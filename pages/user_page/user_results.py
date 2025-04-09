@@ -106,7 +106,7 @@ def display_results_step():
     total_responses = display_results.get("original", 0) + display_results.get("enriched", 0) + display_results.get("neither", 0)
     
     if total_responses == 0:
-        st.warning("No quiz results available for this attempt. Please complete the quiz first.")
+        st.warning("No self-assessment results available for this attempt. Please complete the self-assessment first.")
         
         # If user has no results at all, offer to start the assessment
         if not has_previous_results:
@@ -139,8 +139,8 @@ def display_results_step():
         display_restart_option()
 
 def reset_quiz_session_state():
-    """Reset all quiz-related session state variables"""
-    # Reset quiz results
+    """Reset all self-assessment-related session state variables"""
+    # Reset self-assessment results
     st.session_state.quiz_results = {"original": 0, "enriched": 0, "neither": 0}
     
     # Reset statement preferences

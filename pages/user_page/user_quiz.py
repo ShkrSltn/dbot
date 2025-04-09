@@ -10,7 +10,7 @@ import random  # Добавляем импорт для рандомизации
 import datetime
 
 def display_quiz_step():
-    st.subheader("Step 2: Statement Preference Quiz")
+    st.subheader("Step 2: Statement Preference Self-Assessment")
     
     # Check if we have enriched statements
     if len(st.session_state.get('enriched_statements', [])) < 1:
@@ -20,11 +20,11 @@ def display_quiz_step():
 
 def handle_empty_statements():
     # Generate some sample enriched statements for testing
-    if st.button("Let's start the quiz"):
+    if st.button("Let's start the self-assessment"):
         # Get statements based on user settings
         sample_statements = get_statements_from_settings()
         
-        # Limit to max statements per quiz from settings
+        # Limit to max statements per self-assessment from settings
         max_statements = get_max_statements_setting()
         
         # Take only the first max_statements
@@ -93,7 +93,7 @@ def handle_empty_statements():
                     "subcategory": subcategory
                 })
         
-        st.success(f"Generated {len(sample_statements)} statements! You can now take the quiz.")
+        st.success(f"Generated {len(sample_statements)} statements! You can now take the self-assessment.")
         st.rerun()
 
 def get_max_statements_setting():
@@ -236,11 +236,10 @@ def display_quiz_interface():
             """
             st.markdown(html_content, unsafe_allow_html=True)
             
-            st.markdown("#### Your Preference")
-            
+           
             # Apply meta questions styles
             st.markdown(get_meta_questions_styles(), unsafe_allow_html=True)
-            
+           
             # Display meta questions using the component
             display_meta_questions(
                 statement_idx=statement_idx,

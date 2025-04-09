@@ -6,7 +6,7 @@ from services.metrics_service import calculate_quality_metrics
 from services.db.crud._quiz import save_quiz_results
 
 def display_quiz_step():
-    st.subheader("Step 2: Statement Preference Quiz")
+    st.subheader("Step 2: Statement Preference Self-Assessment")
     
     # Check if we have enriched statements
     if len(st.session_state.get('enriched_statements', [])) < 1:
@@ -16,7 +16,7 @@ def display_quiz_step():
 
 def handle_empty_statements():
     # Generate some sample enriched statements for testing
-    if st.button("Let's start the quiz"):
+    if st.button("Let's start the self-assessment"):
         # Get statements based on user settings
         sample_statements = get_statements_from_settings()
         
@@ -45,7 +45,7 @@ def handle_empty_statements():
                     "metrics": metrics
                 })
         
-        st.success(f"Generated {len(sample_statements)} statements! You can now take the quiz.")
+        st.success(f"Generated {len(sample_statements)} statements! You can now take the self-assessment.")
         st.rerun()
 
 def get_max_statements_setting():
