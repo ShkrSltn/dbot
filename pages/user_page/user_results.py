@@ -20,11 +20,11 @@ def display_results_step():
         if st.session_state.has_previous_results:
             st.session_state.previous_quiz_results = db_quiz_results_list
         else:
-            # Инициализировать как пустой список, а не None
+            # Initialize as an empty list, not None
             st.session_state.previous_quiz_results = []
         has_previous_results = st.session_state.has_previous_results
     
-    # Убедимся, что previous_quiz_results - всегда список, даже если пустой
+    # To ensure previous_quiz_results is always a list, even if empty
     if 'previous_quiz_results' not in st.session_state or st.session_state.previous_quiz_results is None:
         st.session_state.previous_quiz_results = []
     
@@ -42,7 +42,7 @@ def display_results_step():
                 if isinstance(timestamp, str):
                     attempt_label = f"Attempt {i+1} ({timestamp})"
                 else:
-                    # Если есть время обновления и оно отличается от времени создания, показываем его
+                    # If there is an update time and it is different from the creation time, show it
                     if updated_timestamp and updated_timestamp != timestamp:
                         if isinstance(updated_timestamp, str):
                             attempt_label = f"Attempt {i+1} ({timestamp.strftime('%Y-%m-%d %H:%M')}, upd: {updated_timestamp})"
@@ -81,14 +81,14 @@ def display_results_step():
     if selected_result:
         display_results = selected_result
         
-        # Добавим отображение даты создания и обновления, если они есть
+        # Add display of creation and update dates if they exist
         created_at = display_results.get("created_at")
         updated_at = display_results.get("updated_at")
         
         if created_at and not isinstance(created_at, str):
             st.caption(f"Created: {created_at.strftime('%Y-%m-%d %H:%M')}")
             
-            # Показываем дату обновления только если она отличается от даты создания
+            # Show update date only if it is different from the creation date
             if updated_at and updated_at != created_at and not isinstance(updated_at, str):
                 st.caption(f"Last updated: {updated_at.strftime('%Y-%m-%d %H:%M')}")
     elif 'quiz_results' in st.session_state:
@@ -115,10 +115,10 @@ def display_results_step():
                 st.session_state.flow_step = 1
                 st.rerun()
     else:
-        # Проверяем настройку показа компетенций
+        # Check the competency questions display setting
         show_competency_tab = get_competency_questions_enabled()
 
-        # Создаем вкладки в зависимости от настройки
+        # Create tabs depending on the competency questions display setting
         if show_competency_tab:
             tab_preferences, tab_competency = st.tabs(["Statement Preferences", "Competency Assessment"])
             
@@ -131,7 +131,7 @@ def display_results_step():
                 # Display competency results in the second tab
                 display_competency_results(display_results)
         else:
-            # Показываем только одну вкладку с предпочтениями
+            # Show only one tab with preferences
             st.markdown("### Statement Preferences")
             display_results_summary(display_results, total_responses)
             display_detailed_results(display_results)
@@ -431,7 +431,7 @@ def display_competency_results(display_results):
         "I have only a limited understanding of this and need more explanations": "Basic",
         "I have a good understanding of this": "Intermediate",
         "I fully master this topic/issue and I could explain it to others": "Advanced",
-        # Добавляем короткие форматы для обратной совместимости
+        # Add short formats for backward compatibility
         "No knowledge": "No knowledge",
         "Basic": "Basic",
         "Intermediate": "Intermediate",

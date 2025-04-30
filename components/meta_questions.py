@@ -13,15 +13,15 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
         statement (str, optional): The statement text for competency assessment
         show_competency (bool): Whether to show competency assessment questions
     """
-    # Сначала добавляем оценку компетенции, если есть statement и show_competency=True
+    # First add competency assessment, if there is statement and show_competency=True
     responses = {}
     
     if statement and show_competency:
-        # Get category and subcategory for the statement (скрыто от пользователя)
+        # Get category and subcategory for the statement (hidden from user)
         category, subcategory = get_category_for_statement(statement)
         
         if category and subcategory:
-            # Store category and subcategory in session state для этого statement
+            # Store category and subcategory in session state for this statement
             cat_key = f"statement_category_{statement_idx}"
             subcat_key = f"statement_subcategory_{statement_idx}"
             st.session_state[cat_key] = category
@@ -54,7 +54,7 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
             # Store competency response
             responses["competency"] = competency
     
-    # Добавляем разделительную линию без отступов
+    # Add divider line without margins
     divider_html = """
     <div style="margin: 0; padding: 0;">
         <hr style="margin: 0 0 10px 0; padding: 0; border: 0; height: 1px; background-color: #333333;">
@@ -62,7 +62,7 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
     """
     st.markdown(divider_html, unsafe_allow_html=True)
     
-    # Затем показываем вопросы про критерии
+    # Then show questions about criteria
     # st.markdown('<div class="meta-questions-header">Meta Questions</div>', unsafe_allow_html=True)
 
     # Desktop headers
@@ -110,11 +110,11 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
         question = criteria[key]
         radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
         
-        # Увеличим ширину колонки с текстом вопроса для отображения в одну строку
-        row_cols = st.columns([2, 3])  # Изменено с [1, 5] на [2, 3]
+        # Increase the width of the column with the question text for display in one line
+        row_cols = st.columns([2, 3])  # Changed from [1, 5] to [2, 3]
         
         with row_cols[0]:
-            # Добавляем класс для стилизации
+            # Add class for styling
             st.markdown(f'<div class="criteria-text">{question}</div>', unsafe_allow_html=True)
         with row_cols[1]:
             # Get the current value from session state if it exists
@@ -134,7 +134,7 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
             # Store the response in our local dictionary
             responses[key] = response
         
-        # Добавляем тонкую разделительную линию между вопросами (кроме последнего)
+        # Add a thin divider line between questions (except the last one)
         if i < len(criteria_keys) - 1:
             meta_divider_html = """
             <div style="margin: 0; padding: 0;">
@@ -274,7 +274,7 @@ def get_meta_questions_styles():
             opacity: 0.2;
         }
         
-        /* Style для разделительных линий между мета-вопросами */
+        /* Style for divider lines between meta questions */
         .meta-divider {
             height: 1px;
             background-color: #222222;
@@ -286,28 +286,28 @@ def get_meta_questions_styles():
         
         /* Стили для экранов меньше 1000px */
         @media (max-width: 1000px) {
-            /* Уменьшаем заголовок */
+            /* Decrease header */
             .meta-questions-header {
                 font-size: 1rem;
             }
             
-            /* Уменьшаем размер заголовков в шапке */
+            /* Decrease header size */
             .desktop-header {
                 font-size: 0.8rem;
             }
             
-            /* Уменьшаем заголовок критериев */
+            /* Decrease criteria header size */
             .criteria-header {
                 font-size: 0.8rem;
             }
             
-            /* Уменьшаем размер текста критериев */
+            /* Decrease criteria text size */
             .criteria-text {
                 font-size: 0.85rem;
             }
             
             
-            /* Делаем заголовки колонок меньше */
+            /* Make header columns smaller */
             .header-left-left, .header-left, .header-center, .header-right, .header-right-right {
                 font-size: 0.75rem;
             }
@@ -359,10 +359,10 @@ def get_meta_questions_styles():
                 justify-content: center;
                 padding: 8px 4px !important;
                 border-radius: 4px;
-                transform: scale(1); /* Сбрасываем масштаб на мобильных */
+                transform: scale(1); /* Reset scale on mobile */
             }
 
-            /* Критерии текст на мобильных - разрешаем перенос */
+            /* Criteria text on mobile - allow line breaks */
             .criteria-text {
                 white-space: normal;
                 font-size: 0.8rem !important;

@@ -4,10 +4,10 @@ from sqlalchemy.orm import relationship
 import datetime
 import bcrypt
 
-# Создаем базовый класс для моделей
+# Create base class for models
 Base = declarative_base()
 
-# Определяем модели данных
+# Define data models
 class User(Base):
     __tablename__ = 'users'
     
@@ -97,7 +97,7 @@ class ChatMessage(Base):
     # Relationship
     user = relationship("User")
 
-# Добавляем новую модель для сессий пользователей
+# Add new model for user sessions
 class UserSession(Base):
     __tablename__ = 'user_sessions'
     

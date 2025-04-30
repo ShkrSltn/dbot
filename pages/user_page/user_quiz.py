@@ -151,19 +151,19 @@ def display_quiz_interface():
         for i, statement_idx in enumerate(st.session_state.current_statements):
             statement_pair = st.session_state.enriched_statements[statement_idx]
             
-            # Случайно определяем порядок отображения (оригинал - A или B)
+            # Randomly determine the order of display (original - A or B)
             order_key = f"order_{statement_idx}_{quiz_iteration_key}"
             if order_key not in st.session_state:
-                # Случайно определяем, будет ли оригинал первым (A) или вторым (B)
+                # Randomly determine if original will be first (A) or second (B)
                 first_is_original = random.choice([True, False])
                 st.session_state[order_key] = first_is_original
             else:
                 first_is_original = st.session_state[order_key]
             
-            # Сохраняем порядок утверждений для использования при обработке результатов
+            # Save the order of statements for use in processing results
             st.session_state.statement_order[statement_idx] = first_is_original
             
-            # Определяем, какое утверждение будет первым (A), а какое вторым (B)
+            # Determine which statement will be first (A), and which second (B)
             if first_is_original:
                 first_statement = statement_pair["original"]
                 second_statement = statement_pair["enriched"]
@@ -171,15 +171,15 @@ def display_quiz_interface():
                 first_statement = statement_pair["enriched"]
                 second_statement = statement_pair["original"]
             
-            # Получаем категорию и подкатегорию для заголовка
+            # Get category and subcategory for the title
             category = statement_pair.get("category", "")
             # subcategory = statement_pair.get("subcategory", "")
             
             st.markdown("---")
-            # Отображаем категорию вместо "Statement Pair"
+            # Display category instead of "Statement Pair"
             st.markdown(f"## {category if category else f'Statement Pair {i+1}'}")
             
-            # Если есть подкатегория, отображаем ее как подзаголовок
+            # If there is a subcategory, display it as a subheader
             # if subcategory:
             #     st.markdown(f"### {subcategory}")
             
@@ -259,16 +259,16 @@ def display_quiz_interface():
         submitted = st.form_submit_button("Submit All Responses")
         
     if submitted:
-        # Добавим отладку для проверки значений
+        # Add debugging for checking values
         # st.write("Debug info:")
         all_answered = True
         unanswered_questions = []
         
-        # Проверка всех ответов
+        # Check all answers
         for statement_idx in st.session_state.current_statements:
             # st.write(f"Checking statement {statement_idx}")
             
-            # Проверка мета-вопросов
+            # Check meta questions
             for key in criteria.keys():
                 radio_key = f"radio_{key}_{statement_idx}_{quiz_iteration_key}"
                 value = st.session_state.get(radio_key)
@@ -278,7 +278,7 @@ def display_quiz_interface():
                     all_answered = False
                     unanswered_questions.append(f"Statement {statement_idx}: {criteria[key]}")
             
-            # Проверка компетенций только если они включены
+            # Check competencies only if they are enabled
             competency_enabled = get_competency_questions_enabled()
             if competency_enabled:
                 competency_key = f"competency_{statement_idx}_{quiz_iteration_key}"
@@ -320,7 +320,7 @@ def display_quiz_interface():
             responses["category"] = st.session_state.get(cat_key)
             responses["subcategory"] = st.session_state.get(subcat_key)
             
-            # Получаем порядок отображения для этого утверждения
+            # Get the order of display for this statement
             first_is_original = st.session_state.statement_order.get(statement_idx, True)
             
             # Handle the submission for this statement
