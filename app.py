@@ -83,7 +83,7 @@ def verify_session_token(user_id, token):
         session.close()
 
 def run_app():
-    # Hide default sidebar navigation
+    # Hide default sidebars navigation
     st.markdown("""
         <style>
         [data-testid="stSidebarNav"] {
