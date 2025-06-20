@@ -100,6 +100,8 @@ def verify_session_token(user_id, token):
         session.close()
 
 def run_app():
+    print(f"DEBUG: run_app() started")
+    
     # Hide default sidebar navigation and customize responsive behavior
     st.markdown("""
         <style>
@@ -285,75 +287,78 @@ def run_app():
         st.query_params.clear()
         st.rerun()
     
-    # Try to restore current page from session state or query params
-    current_page_from_state = get_current_page()
-    current_page_from_query = st.query_params.get("page", None)
-    
-    # Determine the current page
-    if current_page_from_query:
-        current_page = current_page_from_query
-    elif current_page_from_state:
-        current_page = current_page_from_state
+    # Initialize navigation state if not exists - simplified approach
+    if 'current_nav_page' not in st.session_state:
+        default_page = "User Journey" if st.session_state.current_role != "admin" else "Home"
+        st.session_state.current_nav_page = default_page
+        print(f"DEBUG: Initialized navigation page: {default_page}")
     else:
-        # Default page based on role
-        current_page = "User Journey" if st.session_state.current_role != "admin" else "Home"
+        print(f"DEBUG: Current navigation page: {st.session_state.current_nav_page}")
     
     # Navigation based on role
     if st.session_state.current_role == "admin":
+        # Main navigation options
+        nav_options = ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
+        
+        print(f"DEBUG: nav_options = {nav_options}")
+        
+        # Simple radio without any complex logic
         page = st.sidebar.radio(
             "Navigation",
-            ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"],
-            index=["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"].index(current_page) if current_page in ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"] else 0
+            nav_options,
+            key="admin_nav_radio"
         )
+        print(f"DEBUG: Admin navigation radio selected: {page}")
         
-        # Add Legacy Pages dropdown
+        # Handle Legacy Pages dropdown
+        legacy_page = None
         if page == "Legacy Pages":
             legacy_options = ["Profile Builder", "Enrichment Demo", "Batch Enrichment", "Quiz"]
-            legacy_default_index = 0
-            if current_page in legacy_options:
-                legacy_default_index = legacy_options.index(current_page)
             
             legacy_page = st.sidebar.selectbox(
                 "Select Legacy Page",
                 legacy_options,
-                index=legacy_default_index
+                key="legacy_nav_selectbox"
             )
+            print(f"DEBUG: Legacy page selected: {legacy_page}")
     else:
         page = "User Journey"
+        legacy_page = None
     
-    # Save current page state
-    page_to_save = page
-    if st.session_state.current_role == "admin" and page == "Legacy Pages":
-        page_to_save = legacy_page
+    # Determine final page and update state
+    final_page = legacy_page if legacy_page else page
     
-    # Update page in session state and query params
-    set_current_page(page_to_save)
-    st.query_params.page = page_to_save
+    # Update navigation state based on widget selection
+    print(f"DEBUG: Widget selected: {final_page}, Current state: {st.session_state.get('current_nav_page', 'None')}")
     
-    # Page routing
-    if page == "User Journey":
+    # Update current nav page
+    st.session_state.current_nav_page = final_page
+    
+    # Page routing based on final page
+    if final_page == "User Journey":
         display_user_flow()
     elif st.session_state.current_role == "admin":
-        if page == "Home":
+        if final_page == "Home":
             display_home_page()
-        elif page == "User Settings":
+        elif final_page == "User Settings":
             display_user_settings()
-        elif page == "Chatbot":
+        elif final_page == "Chatbot":
             display_chatbot()
-        elif page == "Analytics":
+        elif final_page == "Analytics":
             display_analytics()
-        elif page == "Prompt Engineer":
+        elif final_page == "Prompt Engineer":
             display_prompt_engineer(sample_statements)
-        elif page == "Legacy Pages":
-            if legacy_page == "Profile Builder":
-                display_profile_builder()
-            elif legacy_page == "Enrichment Demo":
-                display_enrichment_demo(sample_statements)
-            elif legacy_page == "Batch Enrichment":
-                display_batch_enrichment(sample_statements)
-            elif legacy_page == "Quiz":
-                display_quiz()
+        elif final_page == "Profile Builder":
+            display_profile_builder()
+        elif final_page == "Enrichment Demo":
+            display_enrichment_demo(sample_statements)
+        elif final_page == "Batch Enrichment":
+            display_batch_enrichment(sample_statements)
+        elif final_page == "Quiz":
+            display_quiz()
 
     # Add footer
     st.markdown("---")
     st.markdown("DigiBot Demo | Created with Streamlit and LangChain")
+    
+    print(f"DEBUG: run_app() ending normally")
