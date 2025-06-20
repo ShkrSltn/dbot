@@ -259,8 +259,7 @@ def run_app():
         else:
             st.session_state.user_settings = {
                 "selected_categories": [],
-                "custom_statements": [],
-                "max_statements_per_quiz": 5
+                "custom_statements": []
             }
 
     # Sidebar navigation based on role

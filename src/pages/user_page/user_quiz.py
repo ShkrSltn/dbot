@@ -32,11 +32,8 @@ def handle_empty_statements():
         # Get statements based on user settings
         sample_statements = get_statements_from_settings()
         
-        # Limit to max statements per self-assessment from settings
-        max_statements = get_max_statements_setting()
-        
-        # Take only the first max_statements
-        sample_statements = sample_statements[:max_statements]
+        # Use all statements from settings
+        # No limit - take all available statements
         
         # Create context from user profile
         context = ", ".join(
@@ -104,12 +101,8 @@ def handle_empty_statements():
         st.success(f"Generated {len(sample_statements)} statements! You can now take the self-assessment.")
         st.rerun()
 
-def get_max_statements_setting():
-    # Default max statements
-    max_statements = 3
-    if 'user_settings' in st.session_state and 'max_statements_per_quiz' in st.session_state.user_settings:
-        max_statements = st.session_state.user_settings["max_statements_per_quiz"]
-    return max_statements
+# Removed get_max_statements_setting() - no longer needed
+# Now using all available statements
 
 def display_quiz_interface():
     # Show all statements at once instead of one by one
@@ -120,11 +113,8 @@ def display_quiz_interface():
     if 'statement_order' not in st.session_state:
         st.session_state.statement_order = {}
     
-    # Get max statements from settings
-    max_statements = get_max_statements_setting()
-    
-    # Determine how many statements to show (limited by max_statements and available statements)
-    total_statements = min(max_statements, len(st.session_state.enriched_statements))
+    # Use all available statements - no limit
+    total_statements = len(st.session_state.enriched_statements)
     
     # If all statements have been shown, move to results
     if len(st.session_state.quiz_shown_indices) >= total_statements:
@@ -450,8 +440,7 @@ def handle_quiz_submission(statement_idx, responses, first_is_original):
     if statement_idx not in st.session_state.quiz_shown_indices:
         st.session_state.quiz_shown_indices.append(statement_idx)
     
-    max_statements = get_max_statements_setting()
-    is_final = len(st.session_state.quiz_shown_indices) >= min(max_statements, len(st.session_state.enriched_statements))
+    is_final = len(st.session_state.quiz_shown_indices) >= len(st.session_state.enriched_statements)
     
     original_count = st.session_state.statement_preferences.count("original")
     enriched_count = st.session_state.statement_preferences.count("enriched")

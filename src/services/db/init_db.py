@@ -46,9 +46,8 @@ def init_db():
             default_settings = GlobalSettings(
                 key="user_settings",
                 value={
-                    "selected_categories": [],
-                    "custom_statements": [],
-                    "max_statements_per_quiz": 5
+                                    "selected_categories": [],
+                "custom_statements": []
                 }
             )
             session.add(default_settings)

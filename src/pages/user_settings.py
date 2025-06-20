@@ -356,16 +356,6 @@ def display_user_settings():
     with settings_tabs[2]:
         st.subheader("Quiz Settings")
         
-        # Maximum statements per quiz
-        max_statements = st.slider(
-            "Maximum statements per quiz session:",
-            min_value=1,
-            max_value=30,
-            value=global_settings.get("max_statements_per_quiz", 5),
-            step=1
-        )
-        global_settings["max_statements_per_quiz"] = max_statements
-        
         # Display current settings summary
         st.subheader("Current Settings Summary")
         
@@ -379,14 +369,12 @@ def display_user_settings():
             "Setting": [
                 "Selected Statements", 
                 "Custom Statements", 
-                "Total Available Statements",
-                "Max Statements Per Quiz"
+                "Total Available Statements"
             ],
             "Value": [
                 len(global_settings.get("selected_statements", [])),
                 len(global_settings.get("custom_statements", [])),
-                total_statements,
-                global_settings.get("max_statements_per_quiz", 5)
+                total_statements
             ]
         }
         
@@ -601,7 +589,6 @@ def display_user_settings():
                 "Selected Subcategories",
                 "Custom Statements",
                 "Total Statements",
-                "Statements Per Quiz",
                 "Profile Evaluation",
                 "Statement Generation",
                 "Max Generation Attempts"
@@ -611,7 +598,6 @@ def display_user_settings():
                 str(sum(len(subcats) for subcats in global_settings.get("selected_subcategories", {}).values())),
                 str(len(global_settings.get("custom_statements", []))),
                 str(total_statements),
-                str(global_settings.get("max_statements_per_quiz", 5)),
                 "Enabled" if global_settings.get("profile_evaluation_enabled", True) else "Disabled",
                 "Multiple Attempts" if global_settings.get("evaluation_enabled", True) else "Single Attempt",
                 str(global_settings.get("evaluation_max_attempts", 5))

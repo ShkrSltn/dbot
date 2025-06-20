@@ -45,8 +45,7 @@ def get_user_settings(user_id):
         if settings:
             return {
                 "selected_statements": settings.selected_statements,
-                "custom_statements": settings.custom_statements,
-                "max_statements_per_quiz": settings.max_statements_per_quiz
+                "custom_statements": settings.custom_statements
             }
         return None
     except Exception as e:
@@ -73,7 +72,6 @@ def get_global_settings(key="user_settings"):
             default_settings = {
                 "selected_categories": [],
                 "custom_statements": [],
-                "max_statements_per_quiz": 5,
                 "evaluation_enabled": True,
                 "evaluation_max_attempts": 5,
                 "selected_prompt_id": 0,
