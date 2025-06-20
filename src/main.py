@@ -24,27 +24,39 @@ def initialize_app():
             page_title="DigiBot",
             page_icon=":robot:",
             layout="wide",
-            initial_sidebar_state="collapsed"
+            initial_sidebar_state="expanded"
         )
         
-        # Hide default sidebar navigation and customize sidebar behavior on mobile
+        # Hide default sidebar navigation and customize sidebar behavior
         st.markdown("""
             <style>
             [data-testid="stSidebarNav"] {
                 display: none;
             }
-            /* Disable automatic sidebar expansion on mobile */
-            @media (max-width: 640px) {
-                .st-emotion-cache-1cypcdb .st-emotion-cache-1egp7fm {
-                    margin-top: 0;
+            /* Force sidebar to collapse on mobile devices */
+            @media (max-width: 768px) {
+                /* Hide sidebar content on mobile */
+                [data-testid="stSidebar"] > div:first-child {
+                    transform: translateX(-100%);
+                    visibility: hidden;
                 }
-                /* Force sidebar to stay collapsed on mobile */
+                /* Ensure collapsed control is visible on mobile */
                 [data-testid="collapsedControl"] {
-                    display: block;
+                    display: block !important;
+                    visibility: visible !important;
                 }
-                /* Remove sidebar auto-expansion */
-                .st-emotion-cache-uf99v8 {
-                    display: none;
+                /* Force main content to full width on mobile */
+                .main .block-container {
+                    padding-left: 1rem;
+                    padding-right: 1rem;
+                    max-width: none;
+                }
+            }
+            /* Keep sidebar expanded on desktop by default */
+            @media (min-width: 769px) {
+                [data-testid="stSidebar"] > div:first-child {
+                    transform: translateX(0);
+                    visibility: visible;
                 }
             }
             </style>
