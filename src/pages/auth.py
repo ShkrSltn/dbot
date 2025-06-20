@@ -1,7 +1,15 @@
 import streamlit as st
 from services.db.crud._users import authenticate_user, create_anonymous_user
 from services.db.connection import generate_session_token
-from services.cookie_utils import set_session_cookie, clear_session_cookie, store_session_in_state
+from services.cookie_utils import (
+    set_session_data, 
+    clear_session_data, 
+    store_session_in_state,
+    ensure_session_persistence,
+    # Legacy aliases for compatibility
+    set_session_cookie, 
+    clear_session_cookie
+)
 import uuid
 
 
@@ -50,6 +58,7 @@ def display_auth():
             with st.form("login_form"):
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
+                remember_me = st.checkbox("Remember me", value=True, help="Keep me logged in for 7 days")
                 submitted = st.form_submit_button("Login", use_container_width=True)
                 
                 if submitted:
@@ -66,11 +75,15 @@ def display_auth():
                             st.session_state.user = auth_result["user"]
                             st.session_state.current_role = auth_result["user"]["role"]
                             
-                            # Store session data in secure cookie and session state
-                            set_session_cookie(auth_result["user"]["id"], session_token, expires_days=7)
+                            # Store session data in session state and query params
+                            set_session_data(auth_result["user"]["id"], session_token)
                             store_session_in_state(auth_result["user"]["id"], session_token)
                             
+                            # Ensure persistence is set up
+                            ensure_session_persistence()
+                            
                             st.success("Logged in successfully!")
+                            print(f"DEBUG: User {username} logged in successfully")
                             st.rerun()
                         else:
                             st.error("Invalid username or password")
@@ -99,11 +112,15 @@ def display_auth():
                     st.session_state.user = anon_result["user"]
                     st.session_state.current_role = "user"
                     
-                    # Store session data in secure cookie and session state
-                    set_session_cookie(anon_result["user"]["id"], session_token, expires_days=1)
+                    # Store session data in session state and query params
+                    set_session_data(anon_result["user"]["id"], session_token)
                     store_session_in_state(anon_result["user"]["id"], session_token)
                     
+                    # Ensure persistence is set up
+                    ensure_session_persistence()
+                    
                     st.success(f"Demo account created: {anonymous_username}")
+                    print(f"DEBUG: Demo user {anonymous_username} created successfully")
                     st.rerun()
                 else:
                     st.error(f"Failed to create demo account: {anon_result.get('error', 'Unknown error')}")
@@ -120,8 +137,8 @@ def display_auth():
         """)
         
         if st.button("Logout", use_container_width=True):
-            # Clear session cookie
-            clear_session_cookie()
+            # Clear session data using new functions
+            clear_session_data()
             
             # Clear all session state
             for key in list(st.session_state.keys()):
@@ -130,4 +147,5 @@ def display_auth():
             # Clear query params (if any)
             st.query_params.clear()
             
+            print("DEBUG: User logged out successfully")
             st.rerun()

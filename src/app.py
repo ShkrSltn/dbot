@@ -31,8 +31,22 @@ from services.service import (
     verify_session_token
 )
 
-# Import cookie utilities
-from services.cookie_utils import get_session_cookie, clear_session_cookie, get_session_from_state, clear_session_from_state
+# Import cookie utilities with enhanced functions
+from services.cookie_utils import (
+    get_session_data, 
+    clear_session_data, 
+    get_session_from_state, 
+    clear_session_from_state,
+    set_current_page,
+    get_current_page,
+    ensure_session_persistence,
+    restore_session_on_startup,
+    # Legacy aliases for compatibility
+    get_session_cookie, 
+    clear_session_cookie,
+    set_current_page_cookie,
+    get_current_page_cookie
+)
 
 # Import page display functions
 from pages.home import display_home_page
@@ -130,37 +144,46 @@ def run_app():
         st.session_state.current_role = None
         st.session_state.user = None
 
-    # Try to restore session from secure cookie or session state if not authenticated
+    # Enhanced session restoration on startup
     if not st.session_state.authenticated:
-        try:
-            # First try to get session data from session state (immediate availability)
-            session_data = get_session_from_state()
+        print("DEBUG: Attempting to restore session on startup...")
+        
+        # Try the enhanced restoration function
+        restored_session = restore_session_on_startup()
+        
+        if restored_session and 'user_id' in restored_session and 'session_token' in restored_session:
+            user_id = restored_session['user_id']
+            session_token = restored_session['session_token']
             
-            # If not in session state, try cookie
-            if not session_data:
-                session_data = get_session_cookie()
+            print(f"DEBUG: Found session data for user {user_id}")
             
-            if session_data and 'user_id' in session_data and 'session_token' in session_data:
-                user_id = session_data['user_id']
-                session_token = session_data['session_token']
+            # Verify session token is valid for this user
+            if verify_session_token(int(user_id), session_token):
+                print(f"DEBUG: Session token verified for user {user_id}")
                 
-                # Verify session token is valid for this user
-                if verify_session_token(int(user_id), session_token):
-                    # Try to get user from database
-                    user = get_user_by_id(int(user_id))
-                    if user:
-                        st.session_state.authenticated = True
-                        st.session_state.user = user
-                        st.session_state.current_role = user["role"]
+                # Try to get user from database
+                user = get_user_by_id(int(user_id))
+                if user:
+                    print(f"DEBUG: User found in database: {user['username']}")
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.session_state.current_role = user["role"]
+                    
+                    # Ensure persistence for future reloads
+                    ensure_session_persistence()
+                    
+                    print(f"DEBUG: Authentication restored successfully for {user['username']}")
                 else:
-                    # Clear invalid session data
-                    clear_session_cookie()
+                    print("DEBUG: User not found in database")
+                    clear_session_data()
                     clear_session_from_state()
-        except Exception as e:
-            print(f"Error restoring session: {e}")
-            # Clear invalid session data on error
-            clear_session_cookie()
-            clear_session_from_state()
+            else:
+                print("DEBUG: Session token verification failed")
+                # Clear invalid session data
+                clear_session_data()
+                clear_session_from_state()
+        else:
+            print("DEBUG: No valid session data found")
 
     # Check authentication
     if not st.session_state.authenticated:
@@ -244,8 +267,8 @@ def run_app():
     # Show role indicator and logout button
     st.sidebar.success(f"Logged in as {st.session_state.user['username']} ({st.session_state.current_role})")
     if st.sidebar.button("Logout"):
-        # Clear session data
-        clear_session_cookie()
+        # Clear session data using new functions
+        clear_session_data()
         clear_session_from_state()
         
         # Clear authentication
@@ -262,21 +285,50 @@ def run_app():
         st.query_params.clear()
         st.rerun()
     
+    # Try to restore current page from session state or query params
+    current_page_from_state = get_current_page()
+    current_page_from_query = st.query_params.get("page", None)
+    
+    # Determine the current page
+    if current_page_from_query:
+        current_page = current_page_from_query
+    elif current_page_from_state:
+        current_page = current_page_from_state
+    else:
+        # Default page based on role
+        current_page = "User Journey" if st.session_state.current_role != "admin" else "Home"
+    
     # Navigation based on role
     if st.session_state.current_role == "admin":
         page = st.sidebar.radio(
             "Navigation",
-            ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
+            ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"],
+            index=["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"].index(current_page) if current_page in ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"] else 0
         )
         
         # Add Legacy Pages dropdown
         if page == "Legacy Pages":
+            legacy_options = ["Profile Builder", "Enrichment Demo", "Batch Enrichment", "Quiz"]
+            legacy_default_index = 0
+            if current_page in legacy_options:
+                legacy_default_index = legacy_options.index(current_page)
+            
             legacy_page = st.sidebar.selectbox(
                 "Select Legacy Page",
-                ["Profile Builder", "Enrichment Demo", "Batch Enrichment", "Quiz"]
+                legacy_options,
+                index=legacy_default_index
             )
     else:
         page = "User Journey"
+    
+    # Save current page state
+    page_to_save = page
+    if st.session_state.current_role == "admin" and page == "Legacy Pages":
+        page_to_save = legacy_page
+    
+    # Update page in session state and query params
+    set_current_page(page_to_save)
+    st.query_params.page = page_to_save
     
     # Page routing
     if page == "User Journey":
