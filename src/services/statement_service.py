@@ -228,7 +228,13 @@ def get_category_for_statement(statement):
         for subcategory_name, statements in category.items():
             if statement in statements:
                 return category_name, subcategory_name
-    return None, None
+    
+    # For custom statements that aren't in the framework, return a default category
+    return "Custom Digital Skills", "Custom Statement"
+
+def get_default_category_for_custom():
+    """Returns default category and subcategory for custom statements"""
+    return "Custom Digital Skills", "Custom Statement"
 
 def get_all_categories():
     """Returns all categories"""

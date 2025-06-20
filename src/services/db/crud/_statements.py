@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from ..models import Statement
 from ..connection import get_database_connection
+from services.statement_service import get_category_for_statement
 
 def save_statement(user_id, original_text, enriched_text, metrics):
     """Save a statement to the database"""
@@ -39,11 +40,16 @@ def get_statements(user_id):
         statements = session.query(Statement).filter_by(user_id=user_id).all()
         result = []
         for stmt in statements:
+            # Get category and subcategory for each statement
+            category, subcategory = get_category_for_statement(stmt.original)
+            
             result.append({
                 "id": stmt.id,
                 "original": stmt.original,
                 "enriched": stmt.enriched,
                 "metrics": stmt.metrics,
+                "category": category,
+                "subcategory": subcategory,
                 "created_at": stmt.created_at
             })
         return result
@@ -63,11 +69,19 @@ def get_user_statements(user_id):
     
     try:
         statements = session.query(Statement).filter_by(user_id=user_id).all()
-        return [{
-            "original": stmt.original,
-            "enriched": stmt.enriched,
-            "metrics": stmt.metrics
-        } for stmt in statements]
+        result = []
+        for stmt in statements:
+            # Get category and subcategory for each statement
+            category, subcategory = get_category_for_statement(stmt.original)
+            
+            result.append({
+                "original": stmt.original,
+                "enriched": stmt.enriched,
+                "metrics": stmt.metrics,
+                "category": category,
+                "subcategory": subcategory
+            })
+        return result
     except Exception as e:
         print(f"Error getting user statements: {e}")
         return []

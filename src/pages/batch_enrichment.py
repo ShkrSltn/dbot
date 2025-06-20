@@ -1,7 +1,7 @@
 import streamlit as st
 from services.enrichment_service import enrich_statement_with_llm
 from services.metrics_service import calculate_quality_metrics
-from services.statement_service import get_statements_from_settings
+from services.statement_service import get_statements_from_settings, get_category_for_statement
 from services.db.crud._statements import save_statement
 
 def display_batch_enrichment(sample_statements):
@@ -72,17 +72,22 @@ def display_batch_enrichment(sample_statements):
                     progress = (i + 1) / len(all_statements)
                     progress_bar.progress(progress)
                     
+                    # Get category and subcategory for the statement
+                    category, subcategory = get_category_for_statement(statement)
+                    
                     # Enrich statement
                     enriched_statement = enrich_statement_with_llm(context, statement, statement_length)
                     
                     # Calculate metrics
                     metrics = calculate_quality_metrics(statement, enriched_statement)
                     
-                    # Save to session state
+                    # Save to session state with category and subcategory
                     st.session_state.enriched_statements.append({
                         "original": statement,
                         "enriched": enriched_statement,
-                        "metrics": metrics
+                        "metrics": metrics,
+                        "category": category,
+                        "subcategory": subcategory
                     })
                     
                     # Save to database

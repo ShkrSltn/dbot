@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-from services.statement_service import get_statements_from_settings
+from services.statement_service import get_statements_from_settings, get_category_for_statement
 from services.enrichment_service import enrich_statement_with_llm
 from services.metrics_service import calculate_quality_metrics
 from services.db.crud._quiz import save_quiz_results
@@ -33,6 +33,9 @@ def handle_empty_statements():
         # Enrich statements
         with st.spinner("Generating sample statements..."):
             for statement in sample_statements:
+                # Get category and subcategory for the statement
+                category, subcategory = get_category_for_statement(statement)
+                
                 enriched = enrich_statement_with_llm(context, statement, 150)
                 metrics = calculate_quality_metrics(statement, enriched)
                 
@@ -42,7 +45,9 @@ def handle_empty_statements():
                 st.session_state.enriched_statements.append({
                     "original": statement,
                     "enriched": enriched,
-                    "metrics": metrics
+                    "metrics": metrics,
+                    "category": category,
+                    "subcategory": subcategory
                 })
         
         st.success(f"Generated {len(sample_statements)} statements! You can now take the self-assessment.")

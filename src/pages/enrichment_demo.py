@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from services.enrichment_service import enrich_statement_with_llm
 from services.metrics_service import calculate_quality_metrics
+from services.statement_service import get_category_for_statement
 from services.db.crud._statements import save_statement
 
 def display_enrichment_demo(sample_statements):
@@ -54,6 +55,10 @@ def display_enrichment_demo(sample_statements):
                     [f"{k.replace('_', ' ').title()}: {v}" for k, v in st.session_state.profile.items() if v])
                 print(f"DEBUG: Created context: {context[:100]}...")
 
+                # Get category and subcategory for the statement
+                category, subcategory = get_category_for_statement(original_statement)
+                print(f"DEBUG: Category: {category}, Subcategory: {subcategory}")
+
                 # Enrich statement
                 print("DEBUG: Calling enrich_statement_with_llm")
                 enriched_statement = enrich_statement_with_llm(context, original_statement, statement_length)
@@ -64,11 +69,13 @@ def display_enrichment_demo(sample_statements):
                 metrics = calculate_quality_metrics(original_statement, enriched_statement)
                 print(f"DEBUG: Metrics calculated: {metrics}")
 
-                # Save to session state
+                # Save to session state with category and subcategory
                 statement_data = {
                     "original": original_statement,
                     "enriched": enriched_statement,
-                    "metrics": metrics
+                    "metrics": metrics,
+                    "category": category,
+                    "subcategory": subcategory
                 }
                 
                 st.session_state.enriched_statements.append(statement_data)
