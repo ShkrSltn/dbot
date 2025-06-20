@@ -68,10 +68,11 @@ def initialize_app():
             from pages.enrichment_demo import display_enrichment_demo
             from pages.batch_enrichment import display_batch_enrichment
             from pages.quiz import display_quiz
-            print("DEBUG: All legacy page modules imported successfully")
+            from services.cookie_utils import get_session_cookie, clear_session_cookie
+            print("DEBUG: All legacy page modules and cookie utilities imported successfully")
         except ImportError as e:
-            print(f"DEBUG: Error importing page modules: {e}")
-            st.error(f"Error importing page modules: {e}")
+            print(f"DEBUG: Error importing page modules or cookie utilities: {e}")
+            st.error(f"Error importing page modules or cookie utilities: {e}")
             return False
         
         return True

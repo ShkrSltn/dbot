@@ -24,11 +24,35 @@ def display_profile_builder():
                                             value=st.session_state.profile.get("years_experience", 0))
 
         with col2:
-            digital_proficiency = st.select_slider(
+            # Handle digital_proficiency options with proper mapping
+            digital_proficiency_options = {
+                1: "Beginner",
+                2: "Basic", 
+                3: "Intermediate",
+                4: "Advanced",
+                5: "Expert"
+            }
+            
+            # Get current proficiency value and convert if needed
+            current_proficiency = st.session_state.profile.get("digital_proficiency", "Intermediate")
+            
+            # Convert to int if it's a number, or map from string to int
+            if isinstance(current_proficiency, (int, float)) or (isinstance(current_proficiency, str) and current_proficiency.isdigit()):
+                current_proficiency_value = int(current_proficiency)
+            else:
+                # Map string values to numbers
+                reverse_mapping = {v.lower(): k for k, v in digital_proficiency_options.items()}
+                current_proficiency_value = reverse_mapping.get(
+                    str(current_proficiency).lower(), 3  # Default to Intermediate (3)
+                )
+            
+            digital_proficiency = st.selectbox(
                 "Digital Proficiency",
-                options=["Beginner", "Intermediate", "Advanced", "Expert"],
-                value=st.session_state.profile.get("digital_proficiency", "Intermediate")
+                options=list(digital_proficiency_options.keys()),
+                format_func=lambda x: digital_proficiency_options[x],
+                index=current_proficiency_value-1 if 1 <= current_proficiency_value <= 5 else 2
             )
+            
             primary_tasks = st.text_area("Primary Tasks", value=st.session_state.profile.get("primary_tasks", ""))
 
         submit_button = st.form_submit_button("Save Profile")
