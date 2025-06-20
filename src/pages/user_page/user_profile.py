@@ -6,6 +6,8 @@ from services.profile_evaluation_service import evaluate_profile_with_ai
 def display_profile_step():
     st.subheader("Step 1: Create Your Profile")
     
+    # Back button is not needed for Step 1 as it's the first step
+    
     # Initialize suggestion_applied flag if not exists
     if 'suggestion_applied' not in st.session_state:
         st.session_state.suggestion_applied = False

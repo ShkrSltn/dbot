@@ -12,6 +12,14 @@ import datetime
 def display_quiz_step():
     st.subheader("Step 2: Statement Preference Self-Assessment")
     
+    # Add Back button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("← Back", help="Go back to Profile step"):
+            # Import the navigation function
+            from pages.user_page.user_flow import navigate_back_to_step
+            navigate_back_to_step(1)
+    
     # Check if we have enriched statements
     if len(st.session_state.get('enriched_statements', [])) < 1:
         handle_empty_statements()

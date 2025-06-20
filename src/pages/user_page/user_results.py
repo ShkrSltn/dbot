@@ -7,6 +7,14 @@ from services.db.crud._settings import get_competency_questions_enabled
 def display_results_step():
     st.subheader("Step 3: Your Results")
     
+    # Add Back button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("← Back", help="Go back to Self-Assessment step"):
+            # Import the navigation function
+            from pages.user_page.user_flow import navigate_back_to_step
+            navigate_back_to_step(2)
+    
     # Add dropdown for selecting previous results if they exist
     selected_result = None
     
