@@ -10,7 +10,7 @@ def display_user_settings():
     
     st.markdown("""
     Customize the global experience by selecting which statements you want to include in assessments.
-    These settings will affect which statements are shown in the quiz and user journey for all users.
+    These settings will affect which statements are shown in the self assessment and user journey for all users.
     """)
     
     # Get global settings
@@ -24,7 +24,7 @@ def display_user_settings():
     statements = get_all_statements()
     
     # Create tabs for different settings
-    settings_tabs = st.tabs(["Statement Selection", "Custom Statements", "Quiz Settings", "AI Features", "Prompt Settings"])
+    settings_tabs = st.tabs(["Statement Selection", "Custom Statements", "Self Assessment Settings", "AI Features", "Prompt Settings"])
     
     # Tab 1: Combined Statement Selection (Groups + Individual Statements)
     with settings_tabs[0]:
@@ -352,9 +352,9 @@ def display_user_settings():
         else:
             st.info("No custom statements added yet.")
     
-    # Tab 3: Quiz Settings
+    # Tab 3: Self Assessment Settings
     with settings_tabs[2]:
-        st.subheader("Quiz Settings")
+        st.subheader("Self Assessment Settings")
         
         # Display current settings summary
         st.subheader("Current Settings Summary")
@@ -452,11 +452,11 @@ def display_user_settings():
             global_settings["evaluation_max_attempts"] = 1
 
         # Toggle for competency questions
-        st.markdown("### Quiz Features")
+        st.markdown("### Self Assessment Features")
         competency_questions_enabled = st.toggle(
             "Enable Competency Assessment Questions", 
             value=global_settings.get("competency_questions_enabled", True),
-            help="When enabled, users will be asked to assess their competency level for each statement in the quiz."
+            help="When enabled, users will be asked to assess their competency level for each statement in the self assessment."
         )
 
         # Update global settings

@@ -297,7 +297,7 @@ def run_app():
     # Navigation based on role
     if st.session_state.current_role == "admin":
         # Main navigation options
-        nav_options = ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
+        nav_options = ["Home", "Self Assessment Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
         
         print(f"DEBUG: nav_options = {nav_options}")
         
@@ -339,7 +339,7 @@ def run_app():
     elif st.session_state.current_role == "admin":
         if final_page == "Home":
             display_home_page()
-        elif final_page == "User Settings":
+        elif final_page == "Self Assessment Settings":
             display_user_settings()
         elif final_page == "Chatbot":
             display_chatbot()

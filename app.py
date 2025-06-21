@@ -238,7 +238,7 @@ def run_app():
     if st.session_state.current_role == "admin":
         page = st.sidebar.radio(
             "Navigation",
-            ["Home", "User Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
+            ["Home", "Self Assessment Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
         )
         
         # Add Legacy Pages dropdown
@@ -256,7 +256,7 @@ def run_app():
     elif st.session_state.current_role == "admin":
         if page == "Home":
             display_home_page()
-        elif page == "User Settings":
+        elif page == "Self Assessment Settings":
             display_user_settings()
         elif page == "Chatbot":
             display_chatbot()
