@@ -26,8 +26,7 @@ from services.db.crud._users import (
 )
 
 from services.db.crud._statements import (
-    save_statement,
-    get_user_statements
+    save_statement
 )
 
 from services.db.crud._quiz import (

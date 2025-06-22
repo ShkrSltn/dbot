@@ -20,7 +20,6 @@ from services.service import (
     save_chat_message,
     get_chat_history,
     save_statement,
-    get_user_statements,
     save_quiz_results,
     get_quiz_results,
     save_profile,
@@ -211,11 +210,9 @@ def run_app():
 
     # Load user statements from database
     if 'enriched_statements' not in st.session_state:
-        user_statements = get_user_statements(st.session_state.user["id"])
-        if user_statements:
-            st.session_state.enriched_statements = user_statements
-        else:
-            st.session_state.enriched_statements = []
+        # Always start with empty statements - let the system generate fresh ones based on settings
+        # This prevents showing old/accumulated statements and ensures consistency with current settings
+        st.session_state.enriched_statements = []
         
     # Load quiz results from database
     if 'quiz_results' not in st.session_state:

@@ -116,12 +116,10 @@ def initialize_session_state():
     
     # Load user statements from database
     if 'enriched_statements' not in st.session_state:
-        user_statements = get_user_statements(st.session_state.user["id"])
-        if user_statements:
-            st.session_state.enriched_statements = user_statements
-        else:
-            st.session_state.enriched_statements = []
-            
+        # Always start with empty statements - let the system generate fresh ones based on settings
+        # This prevents showing old/accumulated statements and ensures consistency with current settings
+        st.session_state.enriched_statements = []
+    
     # Initialize quiz_shown_indices if not exists
     if 'quiz_shown_indices' not in st.session_state:
         st.session_state.quiz_shown_indices = []
