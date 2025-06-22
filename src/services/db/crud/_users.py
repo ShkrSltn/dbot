@@ -12,11 +12,11 @@ def save_user(username, role="user"):
     
     session = db["Session"]()
     try:
-        # Проверяем, существует ли пользователь
+        # Check if the user exists
         user = session.query(User).filter_by(username=username).first()
         
         if not user:
-            # Создаем нового пользователя
+            # Create new user
             user = User(username=username, role=role)
             session.add(user)
             session.commit()
@@ -70,10 +70,10 @@ def create_anonymous_user(username):
     session = db["Session"]()
     
     try:
-        # Генерируем случайный пароль
+        # Generate a random password
         random_password = uuid.uuid4().hex
         
-        # Создаем нового пользователя
+        # Create new user
         new_user = User(username=username, role="user")
         new_user.set_password(random_password)
         

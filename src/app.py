@@ -64,15 +64,13 @@ from services.profile_evaluation_service import evaluate_profile_with_ai
 
 def verify_session_token(user_id, token):
     """Verify that the session token is valid for the given user_id"""
-    # Здесь должна быть логика проверки токена в базе данных
-    # Например, проверка в таблице sessions, где хранятся активные сессии
     db = get_database_connection()
     if not db:
         return False
     
     session = db["Session"]()
     try:
-        # Проверяем токен в базе данных
+        # Check token in the database
         session_record = session.query(UserSession).filter_by(
             user_id=user_id, 
             token=token,
@@ -80,11 +78,11 @@ def verify_session_token(user_id, token):
         ).first()
         
         if session_record:
-            # Проверяем, не истек ли срок действия токена
+            # Check if the token has expired
             if session_record.expires_at > datetime.datetime.utcnow():
                 return True
             else:
-                # Помечаем токен как истекший
+                # Mark the token as expired
                 session_record.expired = True
                 session.commit()
         return False

@@ -42,10 +42,10 @@ def save_quiz_results(user_id, original_score, enriched_score, neither_score, de
         # Get current datetime for both created_at and updated_at
         current_datetime = datetime.datetime.utcnow()
         
-        # Проверка, включены ли вопросы компетенций
+        # Check if competency questions are enabled
         competency_enabled = get_competency_questions_enabled()
         
-        # Если компетенции отключены, используем пустой список
+        # If competency questions are disabled, use an empty list
         if not competency_enabled:
             competency_results = []
         
@@ -56,7 +56,7 @@ def save_quiz_results(user_id, original_score, enriched_score, neither_score, de
             enriched_preference=enriched_score,
             neither_preference=neither_score,
             detailed_results=detailed_results,
-            competency_results=competency_results or [],  # Убедимся, что competency_results - это список, даже если None
+            competency_results=competency_results or [],  # Make sure competency_results is a list, even if None
             created_at=current_datetime,
             updated_at=current_datetime
         )

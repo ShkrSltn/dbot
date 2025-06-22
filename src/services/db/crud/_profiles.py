@@ -8,15 +8,15 @@ def save_profile(user_id, profile_data):
     
     session = db["Session"]()
     try:
-        # Проверяем, существует ли профиль
+        # Check if the profile exists
         profile = session.query(Profile).filter_by(user_id=user_id).first()
         
         if profile:
-            # Обновляем существующий профиль
+            # Update existing profile
             for key, value in profile_data.items():
                 setattr(profile, key, value)
         else:
-            # Создаем новый профиль
+            # Create new profile
             profile_data['user_id'] = user_id
             profile = Profile(**profile_data)
             session.add(profile)

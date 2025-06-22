@@ -7,6 +7,10 @@ import bcrypt
 # Create base class for models
 Base = declarative_base()
 
+# Timezone-aware datetime function
+def utc_now():
+    return datetime.datetime.now(datetime.timezone.utc)
+
 # Define data models
 class User(Base):
     __tablename__ = 'users'
@@ -15,7 +19,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     password_hash = Column(String(128))
     role = Column(String(20), default='user')
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationships
     profiles = relationship("Profile", back_populates="user", cascade="all, delete-orphan")
@@ -42,8 +46,8 @@ class Profile(Base):
     years_experience = Column(Integer)
     digital_proficiency = Column(String(50))
     primary_tasks = Column(Text)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     # Relationship
     user = relationship("User", back_populates="profiles")
@@ -56,7 +60,7 @@ class Statement(Base):
     original = Column(Text, nullable=False)
     enriched = Column(Text, nullable=False)
     metrics = Column(JSON)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationship
     user = relationship("User", back_populates="statements")
@@ -71,8 +75,8 @@ class QuizResult(Base):
     neither_preference = Column(Integer, default=0)
     detailed_results = Column(JSON, default={})
     competency_results = Column(JSON, default=[])
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now)
     
     # Relationship
     user = relationship("User", back_populates="quiz_results")
@@ -83,7 +87,7 @@ class GlobalSettings(Base):
     id = Column(Integer, primary_key=True)
     key = Column(String(100), unique=True, nullable=False)
     value = Column(JSON)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 class ChatMessage(Base):
     __tablename__ = 'chat_messages'
@@ -92,7 +96,7 @@ class ChatMessage(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationship
     user = relationship("User")
@@ -104,7 +108,7 @@ class UserSession(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     token = Column(String(128), nullable=False, unique=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     expires_at = Column(DateTime, nullable=False)
     expired = Column(Boolean, default=False)
     
@@ -118,8 +122,8 @@ class Prompt(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     name = Column(String(100), nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     # Relationship
     user = relationship("User")
@@ -133,8 +137,8 @@ class Framework(Base):
     structure = Column(JSON, nullable=False)  # JSON field to store the framework structure
     is_default = Column(Boolean, default=False)  # Flag for built-in frameworks
     created_by = Column(Integer, ForeignKey('users.id'))  # Optional: track who created it
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     # Relationship
     creator = relationship("User")
@@ -152,7 +156,7 @@ class PromptHistory(Base):
     metrics = Column(JSON)  # Quality metrics and scores
     evaluation_result = Column(Text)  # AI evaluation result if available
     attempts = Column(Integer, default=1)  # Number of attempts made
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationship
     user = relationship("User") 
