@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from ..models import Statement
 from ..connection import get_database_connection
-from services.statement_service import get_category_for_statement
+from services.statement_service import get_category_for_statement, get_active_framework
 
 def save_statement(user_id, original_text, enriched_text, metrics):
     """Save a statement to the database"""
@@ -39,9 +39,13 @@ def get_statements(user_id):
     try:
         statements = session.query(Statement).filter_by(user_id=user_id).all()
         result = []
+        
+        # Get active framework for category assignment
+        active_framework = get_active_framework()
+        
         for stmt in statements:
-            # Get category and subcategory for each statement
-            category, subcategory = get_category_for_statement(stmt.original)
+            # Get category and subcategory for each statement using active framework
+            category, subcategory = get_category_for_statement(stmt.original, active_framework)
             
             result.append({
                 "id": stmt.id,
@@ -60,19 +64,22 @@ def get_statements(user_id):
         session.close()
 
 def get_user_statements(user_id):
-    """Get all statements for a specific user"""
+    """Get user statements with category and subcategory information"""
     db = get_database_connection()
     if not db:
         return []
     
     session = db["Session"]()
-    
     try:
         statements = session.query(Statement).filter_by(user_id=user_id).all()
         result = []
+        
+        # Get active framework for category assignment
+        active_framework = get_active_framework()
+        
         for stmt in statements:
-            # Get category and subcategory for each statement
-            category, subcategory = get_category_for_statement(stmt.original)
+            # Get category and subcategory for each statement using active framework
+            category, subcategory = get_category_for_statement(stmt.original, active_framework)
             
             result.append({
                 "original": stmt.original,

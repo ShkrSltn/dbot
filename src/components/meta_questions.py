@@ -1,5 +1,6 @@
 import streamlit as st
-from services.statement_service import get_category_for_statement
+from services.statement_service import get_category_for_statement, get_active_framework
+from services.db.crud._settings import get_competency_questions_enabled
 
 def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is_original=True, statement=None, show_competency=True):
     """
@@ -17,8 +18,9 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
     responses = {}
     
     if statement and show_competency:
-        # Get category and subcategory for the statement (hidden from user)
-        category, subcategory = get_category_for_statement(statement)
+        # Get category and subcategory for the statement using active framework
+        active_framework = get_active_framework()
+        category, subcategory = get_category_for_statement(statement, active_framework)
         
         if category and subcategory:
             # Store category and subcategory in session state for this statement
@@ -34,10 +36,10 @@ def display_meta_questions(statement_idx, quiz_iteration_key, criteria, first_is
 
        
             competency_options = [
-                "I have no knowledge of this / I never heard of this",
-                "I have only a limited understanding of this and need more explanations",
-                "I have a good understanding of this",
-                "I fully master this topic/issue and I could explain it to others"
+                "No knowledge - I have no experience with this skill",
+                "Basic - I have limited experience and need guidance",
+                "Intermediate - I can perform this skill with some confidence",
+                "Advanced - I am proficient and can work independently"
             ]
             
             # Add h5 before radio

@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-from services.statement_service import get_statements_from_settings, get_category_for_statement
+from services.statement_service import get_statements_from_settings, get_category_for_statement, get_active_framework
 from services.enrichment_service import enrich_statement_with_llm
 from services.metrics_service import calculate_quality_metrics
 from services.db.crud._quiz import save_quiz_results
@@ -47,11 +47,14 @@ def handle_empty_statements():
     evaluation_enabled = global_settings.get("evaluation_enabled", True) if global_settings else True
     max_attempts = global_settings.get("evaluation_max_attempts", 5) if global_settings else 5
     
+    # Get the active framework for category assignment
+    active_framework = get_active_framework()
+    
     # Enrich statements
     with st.spinner("Generating statements for your self-assessment..."):
         for statement in sample_statements:
-            # Get category and subcategory for the statement
-            category, subcategory = get_category_for_statement(statement)
+            # Get category and subcategory for the statement using active framework
+            category, subcategory = get_category_for_statement(statement, active_framework)
             
             # Choose generation method based on settings
             if evaluation_enabled:

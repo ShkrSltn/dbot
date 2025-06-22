@@ -122,4 +122,19 @@ class Prompt(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
     # Relationship
-    user = relationship("User") 
+    user = relationship("User")
+
+class Framework(Base):
+    __tablename__ = 'frameworks'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text)
+    structure = Column(JSON, nullable=False)  # JSON field to store the framework structure
+    is_default = Column(Boolean, default=False)  # Flag for built-in frameworks
+    created_by = Column(Integer, ForeignKey('users.id'))  # Optional: track who created it
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationship
+    creator = relationship("User") 

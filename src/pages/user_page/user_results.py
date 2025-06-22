@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from services.db.crud._quiz import get_quiz_results_list
 from services.db.crud._settings import get_competency_questions_enabled
+from services.db.crud._frameworks import get_framework
+from services.statement_service import get_active_framework
 from services.results_visualization_service import (
     create_preference_pie_chart,
     create_detailed_criterion_chart,

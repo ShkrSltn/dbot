@@ -1,9 +1,17 @@
 import streamlit as st
 import pandas as pd
 import copy
-from services.statement_service import get_all_statements, get_all_categories, get_statements_by_category, get_all_digcomp_statements, get_subcategories, get_statements_by_subcategory, CURRENT_STATEMENTS, get_category_for_statement
+import json
+from services.statement_service import (get_all_statements, get_all_categories, get_statements_by_category, 
+                                      get_all_digcomp_statements, get_subcategories, get_statements_by_subcategory, 
+                                      CURRENT_STATEMENTS, get_category_for_statement, get_available_frameworks,
+                                      get_active_framework, get_all_framework_statements,
+                                      get_statements_by_category_from_framework, get_statements_by_subcategory_from_framework,
+                                      DIGCOMP_FRAMEWORK)
 from services.db.crud._settings import get_global_settings, save_global_settings
 from services.db.crud._prompts import get_user_prompts, get_all_prompts
+from services.db.crud._frameworks import get_framework
+from components.framework_builder import display_framework_builder, display_framework_list
 from services.enrichment_service import DEFAULT_PROMPT, BASIC_PROMPT, DIGCOMP_FEW_SHOT_PROMPT, GENERAL_FEW_SHOT_PROMPT
 
 def display_user_settings():
@@ -43,6 +51,7 @@ def display_user_settings():
     # Main configuration tabs
     config_tabs = st.tabs([
         "Statement Configuration", 
+        "Framework Management",
         "AI Configuration", 
         "System Configuration",
         "Settings Summary"
@@ -52,114 +61,153 @@ def display_user_settings():
     with config_tabs[0]:
         display_statement_configuration(global_settings)
     
-    # Tab 2: AI Configuration  
+    # Tab 2: Framework Management
     with config_tabs[1]:
+        display_framework_management(global_settings)
+    
+    # Tab 3: AI Configuration  
+    with config_tabs[2]:
         display_ai_configuration(global_settings)
     
-    # Tab 3: System Configuration
-    with config_tabs[2]:
+    # Tab 4: System Configuration
+    with config_tabs[3]:
         display_system_configuration(global_settings)
     
-    # Tab 4: Settings Summary
-    with config_tabs[3]:
+    # Tab 5: Settings Summary
+    with config_tabs[4]:
         display_settings_overview(global_settings)
 
-def display_settings_overview(global_settings):
-    """Display detailed settings overview"""
-    st.subheader("Settings Overview")
+def display_framework_management(global_settings):
+    """Display framework management section"""
+    st.subheader("Framework Management")
+    st.markdown("Create and manage custom competency frameworks.")
     
-    # Create overview columns
-    col1, col2, col3, col4 = st.columns(4)
+    # Framework builder component
+    display_framework_builder()
     
-    with col1:
-        st.metric(
-            "Categories", 
-            len(global_settings.get("selected_categories", []))
-        )
+    st.markdown("---")
     
-    with col2:
-        subcategory_count = sum(len(subcats) for subcats in global_settings.get("selected_subcategories", {}).values())
-        st.metric("Subcategories", subcategory_count)
-    
-    with col3:
-        st.metric(
-            "Individual Statements", 
-            len(global_settings.get("selected_statements", []))
-        )
-    
-    with col4:
-        st.metric(
-            "Custom Statements", 
-            len(global_settings.get("custom_statements", []))
-        )
-    
-    # System settings overview
-    st.markdown("### System Configuration")
-    
-    system_col1, system_col2 = st.columns(2)
-    
-    with system_col1:
-        source = "DigiComp Framework" if global_settings.get("statement_source", "default") == "digcomp" else "Default Statements"
-        st.markdown(f"**Statement Source:** {source}")
-        
-        profile_eval = "Enabled" if global_settings.get("profile_evaluation_enabled", True) else "Disabled"
-        st.markdown(f"**Profile Evaluation:** {profile_eval}")
-    
-    with system_col2:
-        evaluation_mode = "Multiple Attempts" if global_settings.get("evaluation_enabled", True) else "Single Attempt"
-        st.markdown(f"**Statement Generation:** {evaluation_mode}")
-        
-        competency = "Enabled" if global_settings.get("competency_questions_enabled", True) else "Disabled"
-        st.markdown(f"**Competency Questions:** {competency}")
-    
-    # Selected items details
-    if global_settings.get("selected_categories", []):
-        st.markdown("### Selected Categories")
-        categories_df = pd.DataFrame({
-            "Category": global_settings.get("selected_categories", [])
-        })
-        st.dataframe(categories_df, use_container_width=True, hide_index=True)
-    
-    # Selected subcategories
-    selected_subcategories = global_settings.get("selected_subcategories", {})
-    if any(selected_subcategories.values()):
-        st.markdown("### Selected Subcategories")
-        subcategories_data = []
-        for category, subcats in selected_subcategories.items():
-            for subcat in subcats:
-                subcategories_data.append({"Category": category, "Subcategory": subcat})
-        if subcategories_data:
-            subcategories_df = pd.DataFrame(subcategories_data)
-            st.dataframe(subcategories_df, use_container_width=True, hide_index=True)
-    
-    # Custom statements
-    if global_settings.get("custom_statements", []):
-        st.markdown("### Custom Statements")
-        custom_df = pd.DataFrame({
-            "Statement": global_settings.get("custom_statements", [])
-        })
-        st.dataframe(custom_df, use_container_width=True, hide_index=True)
+    # Existing frameworks management component
+    available_frameworks = get_available_frameworks()
+    display_framework_list(available_frameworks)
 
 def display_statement_configuration(global_settings):
     """Display statement configuration section"""
     st.subheader("Statement Configuration")
     st.markdown("Configure which statements are included in assessments.")
     
-    # Statement source selection
-    st.markdown("#### Statement Source")
-    statement_source = st.radio(
-        "Choose the source of statements:",
-        ["Default Statements", "DigiComp Framework"],
-        index=0 if global_settings.get("statement_source", "default") == "default" else 1,
-        horizontal=True
+    # Framework selection
+    st.markdown("#### Select Statement Source")
+    available_frameworks = get_available_frameworks()
+    
+    # Create framework options
+    framework_options = {}
+    framework_options["Default Statements"] = "default"
+    framework_options["DigiComp 2.1 (Legacy)"] = "digcomp"
+    
+    for fw in available_frameworks:
+        if fw.get("is_default"):
+            framework_options[fw["name"]] = fw["id"]
+        else:
+            framework_options[f"{fw['name']} (Custom)"] = fw["id"]
+    
+    # Get current selection
+    current_framework_id = global_settings.get("selected_framework_id")
+    current_source = global_settings.get("statement_source", "default")
+    
+    # Find current selection name
+    current_selection = "Default Statements"
+    for name, fw_id in framework_options.items():
+        if (current_source == "framework" and fw_id == current_framework_id) or \
+           (current_source == "default" and fw_id == "default") or \
+           (current_source == "digcomp" and fw_id == "digcomp"):
+            current_selection = name
+            break
+    
+    selected_framework_name = st.selectbox(
+        "Choose statement source:",
+        options=list(framework_options.keys()),
+        index=list(framework_options.keys()).index(current_selection) if current_selection in framework_options else 0,
+        help="Select which framework or statement set to use for assessments",
+        key="framework_selector"
     )
     
-    global_settings["statement_source"] = "default" if statement_source == "Default Statements" else "digcomp"
+    selected_framework_id = framework_options[selected_framework_name]
+    
+    # Check if framework selection has changed
+    framework_changed = False
+    previous_source = global_settings.get("statement_source", "default")
+    previous_framework_id = global_settings.get("selected_framework_id")
+    
+    # Update settings based on selection
+    if selected_framework_id == "default":
+        new_source = "default"
+        new_framework_id = None
+    elif selected_framework_id == "digcomp":
+        new_source = "digcomp"
+        new_framework_id = None
+    else:
+        new_source = "framework"
+        new_framework_id = selected_framework_id
+    
+    # Check if there's a change
+    if (previous_source != new_source or previous_framework_id != new_framework_id):
+        framework_changed = True
+        
+        # Clear previous selections when framework changes
+        global_settings["selected_categories"] = []
+        global_settings["selected_subcategories"] = {}
+        global_settings["selected_statements"] = []
+        
+        # Update settings
+        global_settings["statement_source"] = new_source
+        global_settings["selected_framework_id"] = new_framework_id
+        
+        # Save the change immediately to prevent loops
+        if save_global_settings("user_settings", global_settings):
+            # Update original settings to prevent change detection
+            st.session_state.original_settings["statement_source"] = new_source
+            st.session_state.original_settings["selected_framework_id"] = new_framework_id
+            st.session_state.original_settings["selected_categories"] = []
+            st.session_state.original_settings["selected_subcategories"] = {}
+            st.session_state.original_settings["selected_statements"] = []
+            
+            # Show success message for framework change
+            st.success(f"✓ Framework changed to: **{selected_framework_name}**. Previous selections cleared.")
+            
+            # Use session state flag to trigger rerun only once
+            if not st.session_state.get("framework_change_processed", False):
+                st.session_state.framework_change_processed = True
+                st.rerun()
+    else:
+        # Clear the flag if no change detected
+        if st.session_state.get("framework_change_processed", False):
+            st.session_state.framework_change_processed = False
+    
+    statement_source = global_settings.get("statement_source", "default")
+    
+    # Show current framework info
+    if statement_source == "framework":
+        framework_id = global_settings.get("selected_framework_id")
+        if framework_id:
+            framework = get_framework(framework_id)
+            if framework:
+                st.success(f"✓ Using framework: **{framework['name']}**")
+            else:
+                st.warning("Selected framework not found. Please select a different one.")
+                return
+    elif statement_source == "digcomp":
+        st.success("✓ Using: **DigiComp 2.1 (Legacy)**")
+    else:
+        st.success("✓ Using: **Default Statements**")
     
     st.markdown("---")
     
     # Statement selection based on source
-    if global_settings.get("statement_source", "default") == "digcomp":
+    if statement_source == "framework":
+        framework = get_active_framework()
+        display_framework_selection(global_settings, framework)
+    elif statement_source == "digcomp":
         display_digcomp_selection(global_settings)
     else:
         display_default_selection(global_settings)
@@ -181,6 +229,7 @@ def display_statement_configuration(global_settings):
     original_subcategories = st.session_state.original_settings.get("selected_subcategories", {})
     original_custom = st.session_state.original_settings.get("custom_statements", [])
     original_source = st.session_state.original_settings.get("statement_source", "default")
+    original_framework_id = st.session_state.original_settings.get("selected_framework_id")
     
     # Current settings
     current_statements = global_settings.get("selected_statements", [])
@@ -188,13 +237,15 @@ def display_statement_configuration(global_settings):
     current_subcategories = global_settings.get("selected_subcategories", {})
     current_custom = global_settings.get("custom_statements", [])
     current_source = global_settings.get("statement_source", "default")
+    current_framework_id = global_settings.get("selected_framework_id")
     
     statements_changed = (
         set(original_statements) != set(current_statements) or
         set(original_categories) != set(current_categories) or
         original_subcategories != current_subcategories or
         original_custom != current_custom or
-        original_source != current_source
+        original_source != current_source or
+        original_framework_id != current_framework_id
     )
     
     if statements_changed:
@@ -210,10 +261,162 @@ def display_statement_configuration(global_settings):
                 st.session_state.original_settings["selected_subcategories"] = copy.deepcopy(global_settings.get("selected_subcategories", {}))
                 st.session_state.original_settings["custom_statements"] = copy.deepcopy(global_settings.get("custom_statements", []))
                 st.session_state.original_settings["statement_source"] = global_settings.get("statement_source", "default")
+                st.session_state.original_settings["selected_framework_id"] = global_settings.get("selected_framework_id")
                 st.success("Statement settings saved successfully!")
                 st.rerun()
             else:
                 st.error("Failed to save statement settings. Please try again.")
+
+def display_framework_selection(global_settings, framework):
+    """Display framework statement selection interface"""
+    all_available_statements = get_all_framework_statements(framework)
+    selected_categories = global_settings.get("selected_categories", [])
+    selected_subcategories = global_settings.get("selected_subcategories", {})
+    selected_statements = global_settings.get("selected_statements", [])
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Select by Category")
+        categories = get_all_categories(framework)
+        
+        for i, category in enumerate(categories):
+            st.markdown(f"**{category}**")
+            
+            # Category selection checkbox
+            is_category_selected = st.checkbox(
+                f"Select All - {category}",
+                value=category in selected_categories,
+                key=f"category_{i}"
+            )
+            
+            # Update category selection (similar logic as digcomp)
+            if is_category_selected and category not in selected_categories:
+                selected_categories.append(category)
+                # Sync with individual statements
+                category_statements = get_statements_by_category_from_framework(category, framework)
+                for statement in category_statements:
+                    statement_index = all_available_statements.index(statement) if statement in all_available_statements else -1
+                    if statement_index >= 0 and statement_index not in selected_statements:
+                        selected_statements.append(statement_index)
+                        
+            elif not is_category_selected and category in selected_categories:
+                selected_categories.remove(category)
+                # Remove statements from this category
+                category_statements = get_statements_by_category_from_framework(category, framework)
+                for statement in category_statements:
+                    statement_index = all_available_statements.index(statement) if statement in all_available_statements else -1
+                    if statement_index >= 0 and statement_index in selected_statements:
+                        remove_statement = True
+                        for cat, subcats in selected_subcategories.items():
+                            if cat != category:
+                                for subcat in subcats:
+                                    subcat_statements = get_statements_by_subcategory_from_framework(cat, subcat, framework)
+                                    if statement in subcat_statements:
+                                        remove_statement = False
+                                        break
+                                if not remove_statement:
+                                    break
+                        
+                        if remove_statement:
+                            selected_statements.remove(statement_index)
+            
+            # Subcategory selection
+            subcategories = get_subcategories(category, framework)
+            if category not in selected_subcategories:
+                selected_subcategories[category] = []
+            
+            for subcategory in subcategories:
+                is_subcategory_selected = st.checkbox(
+                    subcategory,
+                    value=subcategory in selected_subcategories.get(category, []),
+                    key=f"subcategory_{category}_{subcategory.replace(' ', '_')}"
+                )
+                
+                if is_subcategory_selected and subcategory not in selected_subcategories[category]:
+                    selected_subcategories[category].append(subcategory)
+                    # Sync with individual statements
+                    subcat_statements = get_statements_by_subcategory_from_framework(category, subcategory, framework)
+                    for statement in subcat_statements:
+                        statement_index = all_available_statements.index(statement) if statement in all_available_statements else -1
+                        if statement_index >= 0 and statement_index not in selected_statements:
+                            selected_statements.append(statement_index)
+                            
+                elif not is_subcategory_selected and subcategory in selected_subcategories[category]:
+                    selected_subcategories[category].remove(subcategory)
+                    # Remove statements from this subcategory
+                    if category not in selected_categories:
+                        subcat_statements = get_statements_by_subcategory_from_framework(category, subcategory, framework)
+                        for statement in subcat_statements:
+                            statement_index = all_available_statements.index(statement) if statement in all_available_statements else -1
+                            if statement_index >= 0 and statement_index in selected_statements:
+                                remove_statement = True
+                                for cat, subcats in selected_subcategories.items():
+                                    if cat == category and subcategory in subcats:
+                                        continue
+                                    
+                                    for subcat in subcats:
+                                        subcat_statements = get_statements_by_subcategory_from_framework(cat, subcat, framework)
+                                        if statement in subcat_statements:
+                                            remove_statement = False
+                                            break
+                                    
+                                    if not remove_statement:
+                                        break
+                                
+                                if remove_statement and statement_index in selected_statements:
+                                    selected_statements.remove(statement_index)
+            
+            # Add separator between categories
+            st.markdown("---")
+    
+    global_settings["selected_categories"] = selected_categories
+    global_settings["selected_subcategories"] = selected_subcategories
+    
+    with col2:
+        st.markdown("#### Select Individual Statements")
+        
+        statement_filter = st.text_input("Filter statements:", key="statement_filter")
+        
+        for i, statement in enumerate(all_available_statements):
+            if statement_filter and statement_filter.lower() not in statement.lower():
+                continue
+            
+            category, subcategory = get_category_for_statement(statement, framework)
+            is_selected_by_category = category in selected_categories
+            is_selected_by_subcategory = category in selected_subcategories and subcategory in selected_subcategories[category]
+            
+            disabled = is_selected_by_category or is_selected_by_subcategory
+            
+            if disabled:
+                st.checkbox(
+                    statement,
+                    value=True,
+                    key=f"statement_disabled_{i}",
+                    disabled=True,
+                    help=f"Selected via: {category}" if is_selected_by_category else f"Selected via: {subcategory}"
+                )
+            else:
+                is_selected = st.checkbox(
+                    statement,
+                    value=i in selected_statements,
+                    key=f"statement_{i}"
+                )
+                
+                if is_selected and i not in selected_statements:
+                    selected_statements.append(i)
+                elif not is_selected and i in selected_statements:
+                    selected_statements.remove(i)
+    
+    global_settings["selected_statements"] = selected_statements
+    
+    # Clear selections button
+    if st.button("Clear All Selections", key="clear_all_selections_btn"):
+        global_settings["selected_statements"] = []
+        global_settings["selected_categories"] = []
+        global_settings["selected_subcategories"] = {}
+        save_global_settings("user_settings", global_settings)
+        st.rerun()
 
 def display_digcomp_selection(global_settings):
     """Display DigiComp statement selection interface"""
@@ -330,7 +533,7 @@ def display_digcomp_selection(global_settings):
             if statement_filter and statement_filter.lower() not in statement.lower():
                 continue
             
-            category, subcategory = get_category_for_statement(statement)
+            category, subcategory = get_category_for_statement(statement, DIGCOMP_FRAMEWORK)
             is_selected_by_category = category in selected_categories
             is_selected_by_subcategory = category in selected_subcategories and subcategory in selected_subcategories[category]
             
@@ -607,4 +810,94 @@ def display_system_configuration(global_settings):
                 st.success("System settings saved successfully!")
                 st.rerun()
             else:
-                st.error("Failed to save system settings. Please try again.") 
+                st.error("Failed to save system settings. Please try again.")
+
+def display_settings_overview(global_settings):
+    """Display detailed settings overview"""
+    st.subheader("Settings Overview")
+    
+    # Create overview columns
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "Categories", 
+            len(global_settings.get("selected_categories", []))
+        )
+    
+    with col2:
+        subcategory_count = sum(len(subcats) for subcats in global_settings.get("selected_subcategories", {}).values())
+        st.metric("Subcategories", subcategory_count)
+    
+    with col3:
+        st.metric(
+            "Individual Statements", 
+            len(global_settings.get("selected_statements", []))
+        )
+    
+    with col4:
+        st.metric(
+            "Custom Statements", 
+            len(global_settings.get("custom_statements", []))
+        )
+    
+    # System settings overview
+    st.markdown("### System Configuration")
+    
+    system_col1, system_col2 = st.columns(2)
+    
+    with system_col1:
+        # Enhanced source description
+        statement_source = global_settings.get("statement_source", "default")
+        if statement_source == "framework":
+            framework_id = global_settings.get("selected_framework_id")
+            if framework_id:
+                framework = get_framework(framework_id)
+                source_name = framework["name"] if framework else "Unknown Framework"
+                source = f"Custom Framework: {source_name}"
+            else:
+                source = "Framework (Not Selected)"
+        elif statement_source == "digcomp":
+            source = "DigiComp 2.1 (Legacy)"
+        else:
+            source = "Default Statements"
+        
+        st.markdown(f"**Statement Source:** {source}")
+        
+        profile_eval = "Enabled" if global_settings.get("profile_evaluation_enabled", True) else "Disabled"
+        st.markdown(f"**Profile Evaluation:** {profile_eval}")
+    
+    with system_col2:
+        evaluation_mode = "Multiple Attempts" if global_settings.get("evaluation_enabled", True) else "Single Attempt"
+        st.markdown(f"**Statement Generation:** {evaluation_mode}")
+        
+        competency = "Enabled" if global_settings.get("competency_questions_enabled", True) else "Disabled"
+        st.markdown(f"**Competency Questions:** {competency}")
+    
+    # Selected items details
+    if global_settings.get("selected_categories", []):
+        st.markdown("### Selected Categories")
+        categories_df = pd.DataFrame({
+            "Category": global_settings.get("selected_categories", [])
+        })
+        st.dataframe(categories_df, use_container_width=True, hide_index=True)
+    
+    # Selected subcategories
+    selected_subcategories = global_settings.get("selected_subcategories", {})
+    if any(selected_subcategories.values()):
+        st.markdown("### Selected Subcategories")
+        subcategories_data = []
+        for category, subcats in selected_subcategories.items():
+            for subcat in subcats:
+                subcategories_data.append({"Category": category, "Subcategory": subcat})
+        if subcategories_data:
+            subcategories_df = pd.DataFrame(subcategories_data)
+            st.dataframe(subcategories_df, use_container_width=True, hide_index=True)
+    
+    # Custom statements
+    if global_settings.get("custom_statements", []):
+        st.markdown("### Custom Statements")
+        custom_df = pd.DataFrame({
+            "Statement": global_settings.get("custom_statements", [])
+        })
+        st.dataframe(custom_df, use_container_width=True, hide_index=True) 
