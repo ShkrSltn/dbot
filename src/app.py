@@ -50,11 +50,6 @@ from services.cookie_utils import (
 
 # Import page display functions
 from pages.home import display_home_page
-from pages.profile_builder import display_profile_builder
-from pages.enrichment_demo import display_enrichment_demo
-from pages.batch_enrichment import display_batch_enrichment
-from pages.quiz import display_quiz
-from pages.chatbot import display_chatbot
 from pages.analytics import display_analytics
 from pages.user_page.user_flow import display_user_flow
 from pages.user_settings import display_user_settings
@@ -297,7 +292,7 @@ def run_app():
     # Navigation based on role
     if st.session_state.current_role == "admin":
         # Main navigation options
-        nav_options = ["Home", "Self Assessment Settings", "User Journey", "Chatbot", "Analytics", "Prompt Engineer", "Legacy Pages"]
+        nav_options = ["Home", "Self Assessment Settings", "User Journey", "Analytics", "Prompt Engineer"]
         
         print(f"DEBUG: nav_options = {nav_options}")
         
@@ -309,23 +304,11 @@ def run_app():
         )
         print(f"DEBUG: Admin navigation radio selected: {page}")
         
-        # Handle Legacy Pages dropdown
-        legacy_page = None
-        if page == "Legacy Pages":
-            legacy_options = ["Profile Builder", "Enrichment Demo", "Batch Enrichment", "Quiz"]
-            
-            legacy_page = st.sidebar.selectbox(
-                "Select Legacy Page",
-                legacy_options,
-                key="legacy_nav_selectbox"
-            )
-            print(f"DEBUG: Legacy page selected: {legacy_page}")
     else:
         page = "User Journey"
-        legacy_page = None
     
     # Determine final page and update state
-    final_page = legacy_page if legacy_page else page
+    final_page = page
     
     # Update navigation state based on widget selection
     print(f"DEBUG: Widget selected: {final_page}, Current state: {st.session_state.get('current_nav_page', 'None')}")
@@ -341,20 +324,10 @@ def run_app():
             display_home_page()
         elif final_page == "Self Assessment Settings":
             display_user_settings()
-        elif final_page == "Chatbot":
-            display_chatbot()
         elif final_page == "Analytics":
             display_analytics()
         elif final_page == "Prompt Engineer":
             display_prompt_engineer(sample_statements)
-        elif final_page == "Profile Builder":
-            display_profile_builder()
-        elif final_page == "Enrichment Demo":
-            display_enrichment_demo(sample_statements)
-        elif final_page == "Batch Enrichment":
-            display_batch_enrichment(sample_statements)
-        elif final_page == "Quiz":
-            display_quiz()
 
     # Add footer
     st.markdown("---")

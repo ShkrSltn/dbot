@@ -1,0 +1,1 @@
+# Legacy pages - no longer used in the main application 
