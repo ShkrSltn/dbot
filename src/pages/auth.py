@@ -194,8 +194,6 @@ def display_auth():
                 else:
                     st.error(f"Failed to create demo account: {anon_result.get('error', 'Unknown error')}")
             
-            st.info("💡 Demo accounts are temporary and will be deleted after your session ends.")
-            
     else:
         # Show logged in state
         st.success(f"Logged in as {st.session_state.user['username']} ({st.session_state.current_role})")
