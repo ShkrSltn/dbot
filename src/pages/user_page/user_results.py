@@ -281,6 +281,11 @@ def display_competency_results(display_results):
     
     st.markdown("### Your Digital Competency Self-Assessment")
     
+    # Temporary debug information - remove after fixing
+    with st.expander("🐛 Debug Info (temporary)", expanded=False):
+        st.write("**Competency Results Structure:**")
+        st.json(competency_results[:3] if len(competency_results) > 3 else competency_results)
+    
     # Process competency data using visualization service
     df = process_competency_data(competency_results)
     
@@ -288,9 +293,24 @@ def display_competency_results(display_results):
         st.info("No competency assessment data available.")
         return
     
+    # Temporary debug information for DataFrame
+    with st.expander("🐛 DataFrame Debug (temporary)", expanded=False):
+        st.write("**Processed DataFrame:**")
+        st.dataframe(df.head())
+        st.write("**Competency_Value unique values:**")
+        st.write(df["Competency_Value"].unique())
+        st.write("**Category unique values:**")
+        st.write(df["Category"].unique())
+        st.write("**Subcategory unique values:**")
+        st.write(df["Subcategory"].unique())
+    
     # For categories
     category_scores = df.groupby("Category")["Competency_Value"].agg(["mean", "count"]).reset_index()
     category_scores["score_percentage"] = (category_scores["mean"] / 5) * 100
+    
+    # Handle NaN values in score_percentage
+    category_scores["score_percentage"] = category_scores["score_percentage"].fillna(0)
+    category_scores["score_percentage"] = category_scores["score_percentage"].clip(0, 100)  # Ensure values are between 0 and 100
     
     # Create the digital competence visualization with horizontal bars for categories
     st.subheader("Digital Competence")
@@ -315,10 +335,15 @@ def display_competency_results(display_results):
                 
                 subcategory_df = category_df[category_df["Subcategory"] == subcategory]
                 
-                # Calculate percentage
-                subcategory_percentage = (subcategory_df["Competency_Value"].mean() / 5) * 100
+                # Calculate percentage with NaN check
+                mean_value = subcategory_df["Competency_Value"].mean()
+                if pd.isna(mean_value) or mean_value == 0:
+                    subcategory_percentage = 0
+                else:
+                    subcategory_percentage = (mean_value / 5) * 100
                 
-                # Create a progress bar
+                # Create a progress bar with safe percentage value
+                subcategory_percentage = max(0, min(100, subcategory_percentage))  # Clamp between 0 and 100
                 st.progress(subcategory_percentage / 100, f"{subcategory_percentage:.0f}%")
                 
                 # Show statement details

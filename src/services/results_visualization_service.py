@@ -235,6 +235,13 @@ def create_competency_category_progress_bars(category_scores):
         category = row["Category"]
         percentage = row["score_percentage"]
         
+        # Handle NaN percentage values
+        if pd.isna(percentage):
+            percentage = 0
+        
+        # Ensure percentage is within bounds
+        percentage = max(0, min(100, percentage))
+        
         # Get color for this category, fallback to blue if not found
         color = colors.get(category, "#3498db")
         
@@ -259,6 +266,9 @@ def create_competency_subcategory_pie_chart(df, title="Competency by Subcategory
     subcategory_data = df.groupby(["Category", "Subcategory"])["Competency_Value"].agg(["mean", "count"]).reset_index()
     subcategory_data["Percentage"] = (subcategory_data["mean"] / 5) * 100
     
+    # Handle NaN values in Percentage
+    subcategory_data["Percentage"] = subcategory_data["Percentage"].fillna(0)
+    
     # Define colors for each category - updated to match progress bars
     color_map = {
         "Information and data literacy": "#3498db",
@@ -274,7 +284,12 @@ def create_competency_subcategory_pie_chart(df, title="Competency by Subcategory
         base_color = color_map.get(category, "#3498db")
         subcategory_colors.append(base_color)
     
-    overall_score_percentage = (df["Competency_Value"].mean() / 5) * 100
+    # Calculate overall score with NaN handling
+    overall_mean = df["Competency_Value"].mean()
+    if pd.isna(overall_mean):
+        overall_score_percentage = 0
+    else:
+        overall_score_percentage = (overall_mean / 5) * 100
     
     # Create the pie chart
     fig = go.Figure(data=[go.Pie(
@@ -336,17 +351,27 @@ def process_competency_data(competency_results):
     
     df = pd.DataFrame(comp_data)
     
-    # Map from responses to levels
+    # More flexible mapping for competency responses
+    # Support both full text responses and short formats
     response_to_level = {
+        # Full text responses (from radio options)
+        "No knowledge - I have no experience with this skill": "No knowledge",
+        "Basic - I have limited experience and need guidance": "Basic",
+        "Intermediate - I can perform this skill with some confidence": "Intermediate",
+        "Advanced - I am proficient and can work independently": "Advanced",
+        
+        # Legacy full text responses
         "I have no knowledge of this / I never heard of this": "No knowledge",
         "I have only a limited understanding of this and need more explanations": "Basic",
         "I have a good understanding of this": "Intermediate",
         "I fully master this topic/issue and I could explain it to others": "Advanced",
-        # Add short formats for backward compatibility
+        
+        # Short formats for backward compatibility
         "No knowledge": "No knowledge",
         "Basic": "Basic",
         "Intermediate": "Intermediate",
-        "Advanced": "Advanced"
+        "Advanced": "Advanced",
+        "Expert": "Advanced"  # Map Expert to Advanced for consistency
     }
     
     # Add numeric mapping for competency for visualization
@@ -354,13 +379,20 @@ def process_competency_data(competency_results):
         "No knowledge": 1,
         "Basic": 2,
         "Intermediate": 3,
-        "Advanced": 4,
-        "Expert": 5
+        "Advanced": 4
     }
     
-    # Convert response text to levels
+    # Convert response text to levels with fallback
     df["Competency_Level"] = df["Competency"].map(response_to_level)
+    
+    # Handle unknown responses by defaulting to Intermediate
+    df["Competency_Level"] = df["Competency_Level"].fillna("Intermediate")
+    
+    # Convert levels to numeric values
     df["Competency_Value"] = df["Competency_Level"].map(competency_map)
+    
+    # Handle any remaining NaN values
+    df["Competency_Value"] = df["Competency_Value"].fillna(3)  # Default to Intermediate (3)
     
     return df
 
