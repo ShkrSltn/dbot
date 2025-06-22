@@ -1,8 +1,20 @@
 import streamlit as st
-import plotly.graph_objects as go
 import pandas as pd
 from services.db.crud._quiz import get_quiz_results_list
 from services.db.crud._settings import get_competency_questions_enabled
+from services.results_visualization_service import (
+    create_preference_pie_chart,
+    create_detailed_criterion_chart,
+    aggregate_detailed_results,
+    create_competency_category_progress_bars,
+    create_competency_subcategory_pie_chart,
+    process_competency_data,
+    create_competency_level_distribution_chart,
+    get_tendency_text,
+    get_overall_interpretation_text,
+    get_criteria_names
+)
+from components.meta_questions import get_default_criteria
 
 def display_results_step():
     st.subheader("Step 3: Your Results")
@@ -180,84 +192,21 @@ def display_results_summary(display_results, total_responses):
     enriched_count = display_results.get("enriched", 0)
     neither_count = display_results.get("neither", 0)
     
-    # Recalculate total responses to include "neither"
-    total_responses = original_count + enriched_count + neither_count
+    # Create pie chart using the visualization service
+    fig = create_preference_pie_chart(original_count, enriched_count, neither_count, 
+                                    chart_key="summary_pie_chart")
     
-    if total_responses == 0:
-        st.warning("No responses recorded.")
-        return
-    
-    original_percentage = (original_count / total_responses) * 100
-    enriched_percentage = (enriched_count / total_responses) * 100
-    neither_percentage = (neither_count / total_responses) * 100
-    
-    # Create interactive pie chart with Plotly
-    labels = ["Original Statements", "Personalized Statements", "No Preference"]
-    values = [original_count, enriched_count, neither_count]
-    
-    # Define colors
-    colors = ['#3498db', '#ff7675', '#95a5a6']
-    
-    # Create figure
-    fig = go.Figure(data=[go.Pie(
-        labels=labels,
-        values=values,
-        hole=.4,  # Creates a donut chart
-        marker=dict(colors=colors),
-        textinfo='label+percent',
-        textposition='outside',
-        pull=[0.1 if original_percentage > max(enriched_percentage, neither_percentage) else 0, 
-              0.1 if enriched_percentage > max(original_percentage, neither_percentage) else 0,
-              0.1 if neither_percentage > max(original_percentage, neither_percentage) else 0],
-        hoverinfo='label+value+percent',
-        # Improve text positioning to avoid overlaps
-        insidetextorientation='radial'
-    )])
-    
-    # Update layout with improved spacing and positioning
-    fig.update_layout(
-        title={
-            'text': "Overall Statement Preference",
-            'y':0.99,
-            'x':0.15,
-            'xanchor': 'center',
-            'yanchor': 'top'
-        },
-        height=600,  # Further increase height for better spacing
-        margin=dict(t=80, b=100, l=80, r=80),  # Increase margins all around
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.15,  # Position legend further below the chart
-            xanchor="center",
-            x=0.5
-        ),
-        # Improve text positioning
-        uniformtext_minsize=12,
-        uniformtext_mode='hide',
-        # Add more space between labels and chart
-        annotations=[
-            dict(
-                x=0.5,
-                y=-0.1,
-                text="",  # Spacer annotation
-                showarrow=False,
-                xref="paper",
-                yref="paper"
-            )
-        ]
-    )
-    
-    # Display the chart with a unique key
-    st.plotly_chart(fig, use_container_width=True, key="summary_pie_chart")
+    if fig:
+        st.plotly_chart(fig, use_container_width=True, key="summary_pie_chart")
 
 def display_detailed_results(display_results):
     # Display detailed results by criteria
     st.markdown("### Detailed Results by Criteria")
     
-    # Define criteria
-    criteria_keys = ["understand", "read", "detail", "profession", "assessment"]
-    criteria_names = ["Understanding", "Readability", "Detail", "Professional Relevance", "Self-Assessment"]
+    # Get criteria and names
+    default_criteria = get_default_criteria()
+    criteria_keys = list(default_criteria.keys())
+    criteria_names = get_criteria_names()
     
     # Get detailed results safely
     detailed_results = display_results.get("detailed_results", {})
@@ -278,7 +227,7 @@ def display_detailed_results(display_results):
             # Check if we still have criteria to display
             if criteria_idx < len(criteria_keys):
                 key = criteria_keys[criteria_idx]
-                name = criteria_names[criteria_idx]
+                name = criteria_names.get(key, key.capitalize())
                 
                 # Display in the appropriate column
                 with cols[col_idx]:
@@ -296,90 +245,13 @@ def display_detailed_results(display_results):
                     
                     total = sum(values)
                     if total > 0:
-                        weighted_sum = (values[0] * -2 + values[1] * -1 + values[2] * 0 + 
-                                      values[3] * 1 + values[4] * 2)
-                        tendency = weighted_sum / total
-                        overall_tendency += tendency * total
-                        total_weights += total
+                        # Create chart using visualization service
+                        detail_fig, tendency = create_detailed_criterion_chart(values, name, f"detail_chart_{key}")
                         
-                        # Create the bar chart
-                        categories = [
-                            "Completely prefer orig.", 
-                            "Somewhat prefer orig.", 
-                            "Neither", 
-                            "Somewhat prefer pers.", 
-                            "Completely prefer pers."
-                        ]
-                        
-                        # Calculate the tendency line position
-                        tendency_position = (tendency + 2) / 4 * 4  # Map from -2 to 2 range to 0 to 4 range
-                        
-                        # Create the bar chart
-                        detail_fig = go.Figure()
-                        
-                        # Add bars with consistent colors for all criteria
-                        detail_fig.add_trace(go.Bar(
-                            x=categories,
-                            y=values,
-                            text=values,
-                            textposition='auto',
-                            marker_color=['#3498db', '#74b9ff', '#e0e0e0', '#ffb8b8', '#ff7675'],
-                            hoverinfo='y+text'
-                        ))
-                        
-                        # Add tendency line
-                        detail_fig.add_shape(
-                            type="line",
-                            x0=tendency_position,
-                            y0=0,
-                            x1=tendency_position,
-                            y1=max(values) * 1.1 if max(values) > 0 else 10,
-                            line=dict(
-                                color="red",
-                                width=2,
-                                dash="dash",
-                            )
-                        )
-                        
-                        # Add annotation for the tendency
-                        if tendency < -1:
-                            tendency_text = "Strong preference for original"
-                        elif tendency < -0.1:  # Changed threshold to be more sensitive
-                            tendency_text = "Slight preference for original"
-                        elif tendency <= 0.1:  # Changed threshold to be more sensitive
-                            tendency_text = "No preference"
-                        elif tendency < 1:
-                            tendency_text = "Slight preference for personalized"
-                        else:
-                            tendency_text = "Strong preference for personalized"
-                            
-                        detail_fig.add_annotation(
-                            x=tendency_position,
-                            y=max(values) * 1.05 if max(values) > 0 else 5,
-                            text=tendency_text,
-                            showarrow=True,
-                            arrowhead=1,
-                            ax=0,
-                            ay=-40
-                        )
-                        
-                        # Update layout - adjust for smaller width
-                        detail_fig.update_layout(
-                            xaxis=dict(
-                                title="Preference",
-                                tickangle=-45,
-                                tickfont=dict(size=9)  # Smaller font for x-axis labels
-                            ),
-                            yaxis=dict(
-                                title="Number of Responses"
-                            ),
-                            height=350,  # Slightly smaller height
-                            margin=dict(t=30, b=100, l=30, r=30),  # Adjusted margins
-                            font=dict(size=10)  # Smaller font overall
-                        )
-                        
-                        # Add unique key for each plotly chart
-                        st.plotly_chart(detail_fig, use_container_width=True, key=f"detail_chart_{key}")
+                        if detail_fig:
+                            overall_tendency += tendency * total
+                            total_weights += total
+                            st.plotly_chart(detail_fig, use_container_width=True, key=f"detail_chart_{key}")
                     else:
                         st.info(f"No data available for {name} yet.")
         
@@ -393,17 +265,8 @@ def display_detailed_results(display_results):
         
         # Display overall interpretation
         st.subheader("Overall Interpretation")
-        
-        if overall_tendency < -1:
-            st.info("You strongly prefer original statements overall.")
-        elif overall_tendency < -0.1:  # Changed threshold to be more sensitive
-            st.info("You somewhat prefer original statements overall.")
-        elif overall_tendency <= 0.1:  # Changed threshold to be more sensitive
-            st.info("You have no strong preference between original and personalized statements.")
-        elif overall_tendency < 1:
-            st.info("You somewhat prefer personalized statements overall.")
-        else:
-            st.info("You strongly prefer personalized statements overall.")
+        interpretation_text = get_overall_interpretation_text(overall_tendency, is_global=False)
+        st.info(interpretation_text)
 
 def display_competency_results(display_results):
     """Display the competency assessment results using pie charts"""
@@ -416,160 +279,23 @@ def display_competency_results(display_results):
     
     st.markdown("### Your Digital Competency Self-Assessment")
     
-    # Create a dataframe for the competency results
-    comp_data = []
-    for comp in competency_results:
-        comp_data.append({
-            "Category": comp.get("category", "Unknown"),
-            "Subcategory": comp.get("subcategory", "Unknown"),
-            "Statement": comp.get("statement", ""),
-            "Competency": comp.get("competency", "Intermediate")
-        })
+    # Process competency data using visualization service
+    df = process_competency_data(competency_results)
     
-    if not comp_data:
+    if df is None:
         st.info("No competency assessment data available.")
         return
     
-    # Create a DataFrame
-    df = pd.DataFrame(comp_data)
-    
-    # Map from responses to levels - должен обрабатывать как длинные, так и короткие форматы
-    response_to_level = {
-        "I have no knowledge of this / I never heard of this": "No knowledge",
-        "I have only a limited understanding of this and need more explanations": "Basic",
-        "I have a good understanding of this": "Intermediate",
-        "I fully master this topic/issue and I could explain it to others": "Advanced",
-        # Add short formats for backward compatibility
-        "No knowledge": "No knowledge",
-        "Basic": "Basic",
-        "Intermediate": "Intermediate",
-        "Advanced": "Advanced"
-    }
-    
-    # Add numeric mapping for competency for visualization
-    competency_map = {
-        "No knowledge": 1,
-        "Basic": 2,
-        "Intermediate": 3,
-        "Advanced": 4,
-        "Expert": 5
-    }
-    
-    # Convert response text to levels
-    df["Competency_Level"] = df["Competency"].map(response_to_level)
-    df["Competency_Value"] = df["Competency_Level"].map(competency_map)
-    
-    # Calculate competency percentages at each level
-    # For statements (base level)
-    total_statements = len(df)
-    statement_max_score = total_statements * 5  # Max possible score if all were 'Expert'
-    statement_score = df["Competency_Value"].sum()
-    
-    # For subcategories
-    subcategory_scores = df.groupby("Subcategory")["Competency_Value"].agg(["mean", "count"]).reset_index()
-    subcategory_scores["score_percentage"] = (subcategory_scores["mean"] / 5) * 100  # Convert to percentage
-    
     # For categories
     category_scores = df.groupby("Category")["Competency_Value"].agg(["mean", "count"]).reset_index()
-    category_scores["score_percentage"] = (category_scores["mean"] / 5) * 100  # Convert to percentage
-    
-    # Overall competency percentage
-    overall_score_percentage = (df["Competency_Value"].mean() / 5) * 100
+    category_scores["score_percentage"] = (category_scores["mean"] / 5) * 100
     
     # Create the digital competence visualization with horizontal bars for categories
     st.subheader("Digital Competence")
+    create_competency_category_progress_bars(category_scores)
     
-    # Create horizontal progress bars for each category
-    for i, row in category_scores.iterrows():
-        category = row["Category"]
-        percentage = row["score_percentage"]
-        
-        # Define colors based on category
-        colors = {
-            "Information and data literacy": "#3498db",  # Blue
-            "Communication and collaboration": "#e74c3c",  # Red
-            "Digital content creation": "#f1c40f",  # Yellow
-            "Safety": "#2ecc71",  # Green
-            "Problem solving": "#e67e22"   # Orange
-        }
-        
-        color = colors.get(category, "#3498db")
-        
-        # Create container with background color - using rgba for transparency in HTML
-        container_html = f"""
-        <div style="background-color: rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.2); padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="flex: 3;">{category}</div>
-                <div style="flex: 7; background-color: #f0f0f0; height: 30px; border-radius: 15px; position: relative;">
-                    <div style="position: absolute; width: {percentage}%; height: 100%; background-color: {color}; border-radius: 15px; display: flex; align-items: center; justify-content: center;">
-                        <span style="color: white; font-weight: bold;">{percentage:.0f}%</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-        st.markdown(container_html, unsafe_allow_html=True)
-    
-    # Create main pie chart with subcategories and their percentages
-    # Group by subcategory and calculate average competency
-    subcategory_data = df.groupby(["Category", "Subcategory"])["Competency_Value"].mean().reset_index()
-    subcategory_data["Percentage"] = (subcategory_data["Competency_Value"] / 5) * 100
-    
-    # Define colors for each category
-    color_map = {
-        "Information and data literacy": "#3498db",  # Blue
-        "Communication and collaboration": "#e74c3c",  # Red
-        "Digital content creation": "#f1c40f",  # Yellow
-        "Safety": "#2ecc71",  # Green
-        "Problem solving": "#e67e22"   # Orange
-    }
-    
-    # Create a list of colors based on the category of each subcategory
-    subcategory_colors = []
-    for category in subcategory_data["Category"]:
-        base_color = color_map.get(category, "#3498db")
-        subcategory_colors.append(base_color)
-    
-    # Create the pie chart
-    fig = go.Figure(data=[go.Pie(
-        labels=subcategory_data["Subcategory"],
-        values=subcategory_data["Percentage"],
-        hole=0.3,  # Creates a donut chart
-        marker=dict(
-            colors=subcategory_colors,
-            line=dict(color='#FFFFFF', width=2)
-        ),
-        textinfo='label+percent',
-        textposition='outside',
-        insidetextorientation='radial',
-        textfont=dict(size=10),
-        hoverinfo='label+value+percent',
-        hovertemplate='<b>%{label}</b><br>Score: %{value:.1f}%<extra></extra>'
-    )])
-    
-    # Add text in the center
-    fig.add_annotation(
-        x=0.5, y=0.5,
-        text=f"{overall_score_percentage:.0f}%",
-        font=dict(size=24, color='#333333'),
-        showarrow=False
-    )
-    
-    # Update layout
-    fig.update_layout(
-        title={
-            'text': "Competency by Subcategory",
-            'y':0.95,
-            'x':0.5,
-            'xanchor': 'center',
-            'yanchor': 'top'
-        },
-        height=600,
-        showlegend=False,
-        margin=dict(l=20, r=20, t=50, b=20)
-    )
-    
-    # Display the pie chart
+    # Create pie chart using visualization service
+    fig = create_competency_subcategory_pie_chart(df, chart_key="subcategory_pie")
     st.plotly_chart(fig, use_container_width=True, key="subcategory_pie")
     
     # Create expandable sections for detailed subcategory info
@@ -622,16 +348,6 @@ def display_restart_option():
     # Option to restart the quiz
     if st.button("Restart Assessment"):
         # Reset quiz results in both session and database
-        st.session_state.quiz_results = {"original": 0, "enriched": 0, "neither": 0}
-        st.session_state.statement_preferences = []  # Reset statement preferences
-        st.session_state.detailed_quiz_results = {
-            "understand": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "read": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "detail": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "profession": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0},
-            "assessment": {"completely_prefer_original": 0, "somewhat_prefer_original": 0, "neither": 0, "somewhat_prefer_enriched": 0, "completely_prefer_enriched": 0}
-        }
-        st.session_state.competency_results = []  # Reset competency results
-        st.session_state.quiz_shown_indices = []
+        reset_quiz_session_state()
         st.session_state.flow_step = 1
         st.rerun()
