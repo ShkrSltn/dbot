@@ -9,6 +9,8 @@ from services.enrichment_service import (
 from services.metrics_service import calculate_quality_metrics
 from services.db.crud._profiles import get_all_profiles, get_profile
 from services.db.crud._prompts import save_prompt, get_user_prompts, delete_prompt, delete_all_user_prompts
+from services.db.crud._prompt_history import save_prompt_history
+from .prompt_history import display_prompt_history
 import json
 
 def display_prompt_engineer(sample_statements):
@@ -336,6 +338,39 @@ def display_prompt_engineer(sample_statements):
                                         st.metric("Original Meaning", scores.get("retention_of_original_meaning", 0))
                                     with score_cols[3]:
                                         st.metric("Difficulty", scores.get("difficulty", 0))
+                    
+                    # Save to prompt history
+                    try:
+                        # Prepare settings data
+                        settings_data = {
+                            "statement_length": statement_length,
+                            "evaluation_enabled": evaluation_enabled,
+                            "max_attempts": max_attempts if evaluation_enabled else 1,
+                            "profile_type": profile_option,
+                            "selected_profile": st.session_state.selected_profile,
+                            "active_profile": active_profile
+                        }
+                        
+                        # Save history entry
+                        history_id = save_prompt_history(
+                            user_id=st.session_state.user["id"],
+                            prompt_name=st.session_state.current_prompt,
+                            prompt_content=current_prompt,
+                            original_statement=original_statement,
+                            enriched_statement=enriched_statement,
+                            settings=settings_data,
+                            metrics=metrics,
+                            evaluation_result=evaluation if evaluation_enabled and 'evaluation' in locals() else None,
+                            attempts=attempts if evaluation_enabled and 'attempts' in locals() else 1
+                        )
+                        
+                        if history_id:
+                            st.success("✅ Results saved to prompt history!")
+                        else:
+                            st.warning("⚠️ Failed to save to history, but enrichment was successful.")
+                            
+                    except Exception as history_error:
+                        st.warning(f"⚠️ Failed to save to history: {str(history_error)}")
                 
             except Exception as e:
                 st.error(f"Error during enrichment: {str(e)}")
@@ -434,4 +469,7 @@ def display_prompt_engineer(sample_statements):
             with col2:
                 if st.button("Cancel"):
                     st.session_state.confirm_delete_all = False
-                    st.rerun() 
+                    st.rerun()
+    
+    # Display prompt history component
+    display_prompt_history()

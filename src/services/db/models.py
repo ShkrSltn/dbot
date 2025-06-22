@@ -137,4 +137,22 @@ class Framework(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
     # Relationship
-    creator = relationship("User") 
+    creator = relationship("User")
+
+class PromptHistory(Base):
+    __tablename__ = 'prompt_history'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    prompt_name = Column(String(100), nullable=False)  # Name of the prompt used
+    prompt_content = Column(Text, nullable=False)  # Full prompt template content
+    original_statement = Column(Text, nullable=False)  # Original statement that was tested
+    enriched_statement = Column(Text, nullable=False)  # Result after enrichment
+    settings = Column(JSON, nullable=False)  # Settings used (length, profile, evaluation settings, etc.)
+    metrics = Column(JSON)  # Quality metrics and scores
+    evaluation_result = Column(Text)  # AI evaluation result if available
+    attempts = Column(Integer, default=1)  # Number of attempts made
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationship
+    user = relationship("User") 
