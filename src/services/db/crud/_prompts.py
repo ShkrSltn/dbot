@@ -130,3 +130,58 @@ def get_all_prompts():
         return []
     finally:
         session.close()
+
+def get_user_prompt_count(user_id):
+    """
+    Get the count of prompts for a specific user
+    
+    Args:
+        user_id: ID of the user
+        
+    Returns:
+        Integer count of prompts
+    """
+    db = get_database_connection()
+    if not db:
+        return 0
+    
+    session = db["Session"]()
+    try:
+        count = session.query(Prompt).filter_by(user_id=user_id).count()
+        return count
+    except Exception as e:
+        print(f"Error getting user prompt count: {e}")
+        return 0
+    finally:
+        session.close()
+
+def delete_all_user_prompts(user_id):
+    """
+    Delete all prompts for a specific user
+    
+    Args:
+        user_id: ID of the user
+        
+    Returns:
+        Integer count of deleted prompts
+    """
+    db = get_database_connection()
+    if not db:
+        return 0
+    
+    session = db["Session"]()
+    try:
+        prompts = session.query(Prompt).filter_by(user_id=user_id).all()
+        count = len(prompts)
+        
+        for prompt in prompts:
+            session.delete(prompt)
+        
+        session.commit()
+        return count
+    except Exception as e:
+        session.rollback()
+        print(f"Error deleting all user prompts: {e}")
+        return 0
+    finally:
+        session.close()

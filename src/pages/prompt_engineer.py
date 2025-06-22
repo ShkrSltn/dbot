@@ -8,7 +8,7 @@ from services.enrichment_service import (
 )
 from services.metrics_service import calculate_quality_metrics
 from services.db.crud._profiles import get_all_profiles, get_profile
-from services.db.crud._prompts import save_prompt, get_user_prompts, delete_prompt
+from services.db.crud._prompts import save_prompt, get_user_prompts, delete_prompt, delete_all_user_prompts
 import json
 
 def display_prompt_engineer(sample_statements):
@@ -83,14 +83,48 @@ def display_prompt_engineer(sample_statements):
             
             # Add delete button for non-default prompts
             if selected_prompt != 'default' and selected_prompt != 'basic' and selected_prompt != 'digcomp_few_shot' and selected_prompt != 'general_few_shot':
-                if st.button("Delete Selected Prompt"):
-                    if delete_prompt(st.session_state.user["id"], selected_prompt):
-                        del st.session_state.prompts[selected_prompt]
-                        st.session_state.current_prompt = 'default'
-                        st.success(f"Prompt '{selected_prompt}' deleted successfully!")
-                        st.rerun()
+                st.markdown("---")
+                st.markdown("### Prompt Management")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Initialize delete confirmation state
+                    if f'confirm_delete_{selected_prompt}' not in st.session_state:
+                        st.session_state[f'confirm_delete_{selected_prompt}'] = False
+                    
+                    if not st.session_state[f'confirm_delete_{selected_prompt}']:
+                        if st.button("Delete Prompt", key=f"delete_{selected_prompt}", help="Delete the selected prompt"):
+                            st.session_state[f'confirm_delete_{selected_prompt}'] = True
+                            st.rerun()
                     else:
-                        st.error("Failed to delete prompt.")
+                        st.warning(f"Are you sure you want to delete '{selected_prompt}'? This action cannot be undone.")
+                        
+                        col_confirm, col_cancel = st.columns(2)
+                        with col_confirm:
+                            if st.button("Confirm Delete", key=f"confirm_{selected_prompt}", type="primary"):
+                                if delete_prompt(st.session_state.user["id"], selected_prompt):
+                                    del st.session_state.prompts[selected_prompt]
+                                    st.session_state.current_prompt = 'default'
+                                    st.session_state[f'confirm_delete_{selected_prompt}'] = False
+                                    st.success(f"Prompt '{selected_prompt}' deleted successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to delete prompt.")
+                                    st.session_state[f'confirm_delete_{selected_prompt}'] = False
+                        
+                        with col_cancel:
+                            if st.button("Cancel", key=f"cancel_{selected_prompt}"):
+                                st.session_state[f'confirm_delete_{selected_prompt}'] = False
+                                st.rerun()
+                
+                with col2:
+                    st.info(f"**Selected:** {selected_prompt}")
+                    total_prompts = len([k for k in st.session_state.prompts.keys() 
+                                       if k not in ['default', 'basic', 'digcomp_few_shot', 'general_few_shot']])
+                    st.info(f"**Custom prompts:** {total_prompts}")
+            else:
+                st.info("Built-in prompts cannot be deleted.")
         else:
             new_prompt_name = st.text_input("New prompt name:")
             current_prompt = st.text_area(
@@ -304,4 +338,100 @@ def display_prompt_engineer(sample_statements):
                                         st.metric("Difficulty", scores.get("difficulty", 0))
                 
             except Exception as e:
-                st.error(f"Error during enrichment: {str(e)}") 
+                st.error(f"Error during enrichment: {str(e)}")
+    
+    # Prompt Management Section
+    st.markdown("---")
+    st.subheader("All Your Prompts")
+    st.markdown("Manage all your custom prompts in one place.")
+    
+    # Get custom prompts only
+    custom_prompts = {k: v for k, v in st.session_state.prompts.items() 
+                     if k not in ['default', 'basic', 'digcomp_few_shot', 'general_few_shot']}
+    
+    if custom_prompts:
+        # Show prompts in an expandable format
+        for prompt_name, prompt_content in custom_prompts.items():
+            with st.expander(f"{prompt_name}", expanded=False):
+                # Show prompt content
+                st.text_area(f"Content of '{prompt_name}':", value=prompt_content, height=200, disabled=True, key=f"content_{prompt_name}")
+                
+                # Action buttons
+                col1, col2, col3 = st.columns([1, 1, 2])
+                
+                with col1:
+                    if st.button("Edit", key=f"edit_{prompt_name}", help="Edit this prompt"):
+                        st.session_state.current_prompt = prompt_name
+                        st.info(f"Selected '{prompt_name}' for editing. Switch to 'Create New Prompt' mode to edit.")
+                
+                with col2:
+                    # Initialize delete confirmation state for management section
+                    if f'confirm_delete_mgmt_{prompt_name}' not in st.session_state:
+                        st.session_state[f'confirm_delete_mgmt_{prompt_name}'] = False
+                    
+                    if not st.session_state[f'confirm_delete_mgmt_{prompt_name}']:
+                        if st.button("Delete", key=f"delete_mgmt_{prompt_name}", help="Delete this prompt"):
+                            st.session_state[f'confirm_delete_mgmt_{prompt_name}'] = True
+                            st.rerun()
+                    else:
+                        if st.button("Cancel Delete", key=f"cancel_mgmt_{prompt_name}"):
+                            st.session_state[f'confirm_delete_mgmt_{prompt_name}'] = False
+                            st.rerun()
+                
+                with col3:
+                    st.write("")  # Empty space for alignment
+                
+                # Show confirmation block in a separate row when deletion is being confirmed
+                if st.session_state.get(f'confirm_delete_mgmt_{prompt_name}', False):
+                    st.error(f"Delete '{prompt_name}'?")
+                    if st.button("CONFIRM DELETE", key=f"confirm_mgmt_{prompt_name}", type="primary"):
+                        if delete_prompt(st.session_state.user["id"], prompt_name):
+                            del st.session_state.prompts[prompt_name]
+                            if st.session_state.current_prompt == prompt_name:
+                                st.session_state.current_prompt = 'default'
+                            st.session_state[f'confirm_delete_mgmt_{prompt_name}'] = False
+                            st.success(f"Prompt '{prompt_name}' deleted successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete prompt.")
+                            st.session_state[f'confirm_delete_mgmt_{prompt_name}'] = False
+        
+        # Summary
+        st.info(f"You have **{len(custom_prompts)}** custom prompt(s)")
+    else:
+        st.info("No custom prompts yet. Create your first prompt using the form above!")
+    
+    # Bulk actions
+    if len(custom_prompts) > 1:
+        st.markdown("### Bulk Actions")
+        
+        if st.button("Delete All Custom Prompts", help="Delete all your custom prompts"):
+            if 'confirm_delete_all' not in st.session_state:
+                st.session_state.confirm_delete_all = False
+            
+            if not st.session_state.confirm_delete_all:
+                st.session_state.confirm_delete_all = True
+                st.rerun()
+        
+        if st.session_state.get('confirm_delete_all', False):
+            st.error("Are you sure you want to delete ALL your custom prompts? This action cannot be undone!")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("YES, DELETE ALL", type="primary"):
+                    deleted_count = delete_all_user_prompts(st.session_state.user["id"])
+                    
+                    # Remove all custom prompts from session state
+                    for prompt_name in list(custom_prompts.keys()):
+                        if prompt_name in st.session_state.prompts:
+                            del st.session_state.prompts[prompt_name]
+                    
+                    st.session_state.current_prompt = 'default'
+                    st.session_state.confirm_delete_all = False
+                    st.success(f"Deleted {deleted_count} custom prompt(s) successfully!")
+                    st.rerun()
+            
+            with col2:
+                if st.button("Cancel"):
+                    st.session_state.confirm_delete_all = False
+                    st.rerun() 
