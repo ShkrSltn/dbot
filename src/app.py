@@ -54,6 +54,7 @@ from pages.analytics import display_analytics
 from pages.user_page.user_flow import display_user_flow
 from pages.user_settings import display_user_settings
 from pages.prompt_engineer import display_prompt_engineer
+from pages.user_management import display_user_management
 
 # Import database connection and models
 from services.db.connection import get_database_connection
@@ -290,7 +291,7 @@ def run_app():
     # Navigation based on role
     if st.session_state.current_role == "admin":
         # Main navigation options
-        nav_options = ["Home", "Self Assessment Settings", "User Journey", "Analytics", "Prompt Engineer"]
+        nav_options = ["Home", "Self Assessment Settings", "User Journey", "Analytics", "Prompt Engineer", "User Management"]
         
         print(f"DEBUG: nav_options = {nav_options}")
         
@@ -326,6 +327,8 @@ def run_app():
             display_analytics()
         elif final_page == "Prompt Engineer":
             display_prompt_engineer(sample_statements)
+        elif final_page == "User Management":
+            display_user_management()
 
     # Add footer
     st.markdown("---")
