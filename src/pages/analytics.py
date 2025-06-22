@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from services.db.crud._quiz import get_quiz_results_all_users
+import datetime
+from services.db.crud._quiz import get_quiz_results_all_users, get_available_quiz_dates, get_quiz_results_by_date_range
 from services.db.crud._settings import get_competency_questions_enabled
 from services.results_visualization_service import (
     create_preference_pie_chart,
@@ -25,13 +26,72 @@ def display_analytics():
     st.title("📊 Analytics Dashboard")
     st.markdown("### Global Results from All Users")
     
-    # Get aggregated quiz results for all users
-    all_quiz_results = get_quiz_results_all_users()
+    # Date filtering section
+    st.markdown("#### Date Filter")
+    
+    # Get available dates from database
+    available_dates = get_available_quiz_dates()
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        # Date range selection
+        filter_type = st.selectbox(
+            "Filter by:",
+            ["All dates", "Single date", "Date range"],
+            key="date_filter_type"
+        )
+    
+    start_date = None
+    end_date = None
+    
+    if filter_type == "Single date" and available_dates:
+        with col2:
+            selected_date = st.selectbox(
+                "Select date:",
+                available_dates,
+                key="single_date_select"
+            )
+            start_date = end_date = selected_date
+    elif filter_type == "Date range" and available_dates:
+        with col2:
+            start_date = st.selectbox(
+                "From date:",
+                available_dates,
+                index=len(available_dates)-1 if available_dates else 0,
+                key="start_date_select"
+            )
+        with col3:
+            # Filter end_date options to be >= start_date
+            valid_end_dates = [date for date in available_dates if date >= start_date] if start_date else available_dates
+            end_date = st.selectbox(
+                "To date:",
+                valid_end_dates,
+                key="end_date_select"
+            )
+    
+    if filter_type != "All dates" and not available_dates:
+        st.info("No quiz results available yet.")
+        return
+    
+    # Get filtered quiz results
+    if filter_type == "All dates":
+        all_quiz_results = get_quiz_results_all_users()
+        date_info = "All available data"
+    else:
+        all_quiz_results = get_quiz_results_by_date_range(start_date, end_date)
+        if filter_type == "Single date":
+            date_info = f"Data for {start_date}"
+        else:
+            date_info = f"Data from {start_date} to {end_date}"
     
     if not all_quiz_results:
-        st.warning("No quiz results available for analysis.")
+        st.warning("No quiz results available for the selected date range.")
         st.info("Users need to complete assessments to generate analytics.")
         st.stop()
+    
+    # Display date info
+    st.info(f"📅 Showing: {date_info} ({len(all_quiz_results)} responses)")
     
     # Check the competency questions display setting
     show_competency_tab = get_competency_questions_enabled()
@@ -43,7 +103,7 @@ def display_analytics():
     )
     
     if total_responses == 0:
-        st.warning("No assessment responses available for analysis.")
+        st.warning("No assessment responses available for analysis in the selected date range.")
         st.stop()
     
     # Create tabs depending on the competency questions display setting

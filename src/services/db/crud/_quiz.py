@@ -146,3 +146,70 @@ def get_quiz_results_list(user_id):
         return None
     finally:
         session.close()
+
+def get_available_quiz_dates():
+    """Get all available dates from quiz results for date filtering"""
+    db = get_database_connection()
+    if not db:
+        return []
+    
+    session = db["Session"]()
+    
+    try:
+        # Get distinct dates from quiz results
+        dates_query = session.query(QuizResult.created_at).distinct().all()
+        dates = []
+        for date_tuple in dates_query:
+            if date_tuple[0]:  # Check if created_at is not None
+                # Convert datetime to date for filtering
+                date_only = date_tuple[0].date()
+                if date_only not in dates:
+                    dates.append(date_only)
+        
+        # Sort dates in descending order (newest first)
+        dates.sort(reverse=True)
+        return dates
+    except Exception as e:
+        print(f"Error getting available quiz dates: {e}")
+        return []
+    finally:
+        session.close()
+
+def get_quiz_results_by_date_range(start_date=None, end_date=None):
+    """Get quiz results filtered by date range"""
+    db = get_database_connection()
+    if not db:
+        return []
+    
+    session = db["Session"]()
+    
+    try:
+        query = session.query(QuizResult)
+        
+        # Apply date filters if provided
+        if start_date:
+            # Convert date to datetime for comparison (start of day)
+            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+            query = query.filter(QuizResult.created_at >= start_datetime)
+        
+        if end_date:
+            # Convert date to datetime for comparison (end of day)
+            end_datetime = datetime.datetime.combine(end_date, datetime.time.max)
+            query = query.filter(QuizResult.created_at <= end_datetime)
+        
+        quiz_results = query.all()
+        
+        return [{
+            "original": result.original_preference,
+            "enriched": result.enriched_preference,
+            "neither": result.neither_preference,
+            "detailed_results": result.detailed_results,
+            "competency_results": result.competency_results,
+            "created_at": result.created_at,
+            "updated_at": result.updated_at
+        } for result in quiz_results]
+    except Exception as e:
+        print(f"Error getting quiz results by date range: {e}")
+        return []
+    finally:
+        session.close()
