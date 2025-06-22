@@ -9,22 +9,22 @@ def get_analytics_data(user_id=None):
     engine = db["engine"]
     
     try:
-        # Если указан user_id, получаем данные только для этого пользователя
+        # If user_id is specified, get data only for this user
         user_filter = f"WHERE user_id = {user_id}" if user_id else ""
         
-        # Получаем статистику по обогащенным утверждениям
+        # Get statistics for enriched statements
         statements_df = pd.read_sql(
             f"SELECT * FROM statements {user_filter}",
             engine
         )
         
-        # Получаем статистику по результатам викторины
+        # Get statistics for quiz results
         quiz_results_df = pd.read_sql(
             f"SELECT * FROM quiz_results {user_filter}",
             engine
         )
         
-        # Получаем статистику по сообщениям чата
+        # Get statistics for chat messages
         chat_messages_df = pd.read_sql(
             f"SELECT * FROM chat_messages {user_filter}",
             engine
