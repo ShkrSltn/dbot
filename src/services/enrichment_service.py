@@ -139,10 +139,9 @@ Enrich the statement while keeping its meaning intact, ensuring clarity, relevan
 
 def calculate_length(original_statement: str, statement_length: int) -> int:
     """Calculate the appropriate length for the enriched statement"""
-    # If statement_length is a percentage
-    if statement_length <= 100:
-        return max(150, round(len(original_statement) * (1 + statement_length / 100)))
-    # If statement_length is an absolute character count
+    # All values are treated as absolute character count
+    # The percentage logic was causing issues when users set values like 100
+    # which should be 100 characters, not 100% increase
     return statement_length
 
 def enrich_statement_with_llm(
