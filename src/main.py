@@ -30,33 +30,54 @@ def initialize_app():
         # Hide default sidebar navigation and customize sidebar behavior
         st.markdown("""
             <style>
+            /* Hide default Streamlit navigation */
             [data-testid="stSidebarNav"] {
-                display: none;
+                display: none !important;
             }
-            /* Force sidebar to collapse on mobile devices */
-            @media (max-width: 768px) {
-                /* Hide sidebar content on mobile */
-                [data-testid="stSidebar"] > div:first-child {
-                    transform: translateX(-100%);
-                    visibility: hidden;
+            
+            /* Desktop: Sidebar expanded by default */
+            @media (min-width: 769px) {
+                [data-testid="stSidebar"] {
+                    transform: translateX(0) !important;
+                    visibility: visible !important;
                 }
-                /* Ensure collapsed control is visible on mobile */
+                [data-testid="stSidebar"] > div:first-child {
+                    transform: translateX(0) !important;
+                    visibility: visible !important;
+                }
+                /* Hide collapse button on desktop */
+                [data-testid="collapsedControl"] {
+                    display: none !important;
+                }
+            }
+            
+            /* Mobile: Sidebar collapsed by default */
+            @media (max-width: 768px) {
+                [data-testid="stSidebar"] {
+                    width: 0 !important;
+                    transform: translateX(-100%) !important;
+                }
+                [data-testid="stSidebar"] > div:first-child {
+                    transform: translateX(-100%) !important;
+                    visibility: hidden !important;
+                }
+                /* Show collapse control (hamburger menu) on mobile */
                 [data-testid="collapsedControl"] {
                     display: block !important;
                     visibility: visible !important;
+                    position: fixed !important;
+                    top: 0.5rem !important;
+                    left: 0.5rem !important;
+                    z-index: 999999 !important;
+                    background: white !important;
+                    border-radius: 4px !important;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
                 }
-                /* Force main content to full width on mobile */
+                /* Ensure main content uses full width on mobile */
                 .main .block-container {
-                    padding-left: 1rem;
-                    padding-right: 1rem;
-                    max-width: none;
-                }
-            }
-            /* Keep sidebar expanded on desktop by default */
-            @media (min-width: 769px) {
-                [data-testid="stSidebar"] > div:first-child {
-                    transform: translateX(0);
-                    visibility: visible;
+                    padding-left: 1rem !important;
+                    padding-right: 1rem !important;
+                    max-width: none !important;
                 }
             }
             </style>

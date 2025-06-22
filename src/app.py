@@ -98,34 +98,63 @@ def run_app():
     # Hide default sidebar navigation and customize responsive behavior
     st.markdown("""
         <style>
+        /* Hide default Streamlit navigation */
         [data-testid="stSidebarNav"] {
-            display: none;
+            display: none !important;
         }
-        /* Force sidebar to collapse on mobile devices */
-        @media (max-width: 768px) {
-            /* Hide sidebar content on mobile */
-            [data-testid="stSidebar"] > div:first-child {
-                transform: translateX(-100%);
-                visibility: hidden;
+        
+        /* Desktop: Sidebar expanded by default */
+        @media (min-width: 769px) {
+            [data-testid="stSidebar"] {
+                transform: translateX(0) !important;
+                visibility: visible !important;
             }
-            /* Ensure collapsed control is visible on mobile */
+            [data-testid="stSidebar"] > div:first-child {
+                transform: translateX(0) !important;
+                visibility: visible !important;
+            }
+            /* Hide collapse button on desktop */
+            [data-testid="collapsedControl"] {
+                display: none !important;
+            }
+        }
+        
+        /* Mobile: Sidebar collapsed by default */
+        @media (max-width: 768px) {
+            [data-testid="stSidebar"] {
+                width: 0 !important;
+                transform: translateX(-100%) !important;
+            }
+            [data-testid="stSidebar"] > div:first-child {
+                transform: translateX(-100%) !important;
+                visibility: hidden !important;
+            }
+            /* Show collapse control (hamburger menu) on mobile */
             [data-testid="collapsedControl"] {
                 display: block !important;
                 visibility: visible !important;
+                position: fixed !important;
+                top: 0.5rem !important;
+                left: 0.5rem !important;
+                z-index: 999999 !important;
+                background: white !important;
+                border-radius: 4px !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             }
-            /* Force main content to full width on mobile */
+            /* Ensure main content uses full width on mobile */
             .main .block-container {
-                padding-left: 1rem;
-                padding-right: 1rem;
-                max-width: none;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                max-width: none !important;
             }
         }
-        /* Keep sidebar expanded on desktop by default */
-        @media (min-width: 769px) {
-            [data-testid="stSidebar"] > div:first-child {
-                transform: translateX(0);
-                visibility: visible;
-            }
+        
+        /* User logout button styling for better mobile UX */
+        
+        /* Enhanced footer logout button appearance */
+        [data-testid="column"] .stButton button {
+            font-size: 1rem !important;
+            padding: 0.5rem 1.5rem !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -327,8 +356,35 @@ def run_app():
         elif final_page == "User Management":
             display_user_management()
 
-    # Add footer
+    # Add footer with logout button for non-admin users  
     st.markdown("---")
+    
+    # For non-admin users, add logout button in footer for better mobile accessibility
+    if st.session_state.current_role != "admin":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:  # Center the logout button
+            if st.button("🚪 Logout", key="user_logout_footer", 
+                        help="Logout from DigiBot", 
+                        use_container_width=True,
+                        type="secondary"):
+                # Clear session data using new functions
+                clear_session_data()
+                clear_session_from_state()
+                
+                # Clear authentication
+                st.session_state.authenticated = False
+                st.session_state.current_role = None
+                st.session_state.user = None
+                
+                # Clear remaining session state
+                for key in list(st.session_state.keys()):
+                    if key not in ['authenticated', 'current_role', 'user']:
+                        del st.session_state[key]
+                        
+                # Clear any remaining query params
+                st.query_params.clear()
+                st.rerun()
+    
     st.markdown("DigiBot Demo | Created with Streamlit and LangChain")
     
     print(f"DEBUG: run_app() ending normally")
