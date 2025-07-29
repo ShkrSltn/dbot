@@ -24,15 +24,15 @@ if [ "$BUILD_METHOD" = "1" ]; then
     docker buildx build --no-cache --platform linux/amd64 -t $APP_NAME:$TAG --load . || handle_failure "Local Docker build"
     
     echo "Tagging Docker image..."
-    docker tag $APP_NAME:$TAG gcr.io/digibot-streamlit-458413/$APP_NAME:$TAG || handle_failure "Docker tagging"
+    docker tag $APP_NAME:$TAG gcr.io/digibot-450706/$APP_NAME:$TAG || handle_failure "Docker tagging"
     
     echo "Pushing Docker image to Google Container Registry..."
-    docker push gcr.io/digibot-streamlit-458413/$APP_NAME:$TAG || handle_failure "Docker push"
+    docker push gcr.io/digibot-450706/$APP_NAME:$TAG || handle_failure "Docker push"
     
 elif [ "$BUILD_METHOD" = "2" ]; then
     # Google Cloud Build
     echo "Building Docker image for $APP_NAME using Google Cloud Build..."
-    gcloud builds submit --tag gcr.io/digibot-streamlit-458413/$APP_NAME:$TAG . || handle_failure "Google Cloud Build"
+    gcloud builds submit --tag gcr.io/digibot-450706/$APP_NAME:$TAG . || handle_failure "Google Cloud Build"
     
 else
     echo "Invalid choice. Exiting."
@@ -41,6 +41,6 @@ fi
 
 # Deploy to Google Cloud Run
 echo "Deploying $APP_NAME to Google Cloud Run..."
-gcloud run deploy $APP_NAME --image gcr.io/digibot-streamlit-458413/$APP_NAME:$TAG --platform managed --region europe-west6 --allow-unauthenticated --revision-suffix=$(date +%s) || handle_failure "Google Cloud Run deployment"
+gcloud run deploy $APP_NAME --image gcr.io/digibot-450706/$APP_NAME:$TAG --platform managed --region europe-west6 --allow-unauthenticated --revision-suffix=$(date +%s) || handle_failure "Google Cloud Run deployment"
 
 echo "$APP_NAME deployment completed successfully."
